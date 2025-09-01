@@ -1,0 +1,16 @@
+{
+    "name": "@leadloopr/tracker",
+    "version": "0.0.1",
+    "private": true,
+    "main": "dist/leadloopr-tracker.js",
+    "types": "dist/init.d.ts",
+    "scripts": {
+        "dev": "vite build --watch",
+        "build": "tsc && vite build",
+        "typecheck": "tsc --noEmit"
+    },
+    "devDependencies": {
+        "typescript": "^5.0.0",
+        "vite": "^5.0.0"
+    }
+}

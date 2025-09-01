@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Vite + React</title>
+    
+    <!-- Google Ads Global Site Tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=AW-17408650618"></script>
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag() { dataLayer.push(arguments); }
+      gtag('js', new Date());
+      gtag('config', 'AW-17408650618');
+    </script>
+
+    <!-- Microsoft Ads UET Base Tag -->
+    <script>
+    (function(w,d,t,r,u)
+    {
+        var f,n,i;
+        w[u]=w[u]||[],f=function()
+        {
+            var o={ti:"112415199", enableAutoSpaTracking: true};
+            o.q=w[u],w[u]=new UET(o),w[u].push("pageLoad")
+        },
+        n=d.createElement(t),n.src=r,n.async=1,n.onload=n.onreadystatechange=function()
+        {
+            var s=this.readyState;
+            s&&s!=="loaded"&&s!=="complete"||(f(),n.onload=n.onreadystatechange=null)
+        },
+        i=d.getElementsByTagName(t)[0],i.parentNode.insertBefore(n,i)
+    })
+    (window,document,"script","//bat.bing.com/bat.js","uetq");
+</script>
+
+
+    <!-- Microsoft Ads Conversion Tracking Function -->
+    <script>
+     function uet_report_conversion() {
+     window.uetq = window.uetq || [];
+     window.uetq.push('event', 'submit_lead_form', {});
+}
+    </script>
+
+    <!-- Meta Pixel Code -->
+    <script>
+      !function(f,b,e,v,n,t,s) {
+        if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('init', '3030047790492973');
+      fbq('track', 'PageView');
+    </script>
+    <!-- End Meta Pixel Code -->
+
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <!-- Your Vite/React App -->
+    <script type="module" src="/src/main.jsx"></script>
+
+    <!-- Your Custom Tracker -->
+    <script
+      id="leadloopr-tracker"
+      src="/leadloopr-tracker.iife.js"
+      data-org-id="org_test123"
+      data-debug="true"
+      data-endpoint="http://localhost:9001/api/form-data"
+    ></script>
+
+    <!-- Meta Pixel NoScript -->
+    <noscript>
+      <img height="1" width="1" style="display:none" 
+           src="https://www.facebook.com/tr?id=3030047790492973&ev=PageView&noscript=1" />
+    </noscript>
+  </body>
+</html>

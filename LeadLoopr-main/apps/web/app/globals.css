@@ -1,0 +1,318 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Futuristic design system with glassmorphism and glowing effects */
+
+@layer base {
+    :root {
+        /* Base colors - light theme */
+        --background: 240 20% 99%;
+        --foreground: 240 10% 3.9%;
+
+        /* Glassmorphic surfaces */
+        --glass: 240 15% 95%;
+        --glass-foreground: 240 10% 10%;
+        --glass-border: 240 20% 88%;
+
+        /* Primary brand colors with glow variants */
+        --primary: 213 100% 49%;
+        --primary-foreground: 210 20% 98%;
+        --primary-glow: 213 100% 65%;
+        --primary-muted: 213 30% 92%;
+
+        /* Secondary futuristic accents */
+        --secondary: 200 100% 50%;
+        --secondary-foreground: 240 10% 3.9%;
+        --secondary-glow: 200 100% 70%;
+        --secondary-muted: 200 50% 95%;
+
+        /* Neutral palette */
+        --muted: 240 4.8% 95.9%;
+        --muted-foreground: 240 3.8% 46.1%;
+
+        --accent: 240 4.8% 95.9%;
+        --accent-foreground: 240 5.9% 10%;
+
+        --card: 240 15% 97%;
+        --card-foreground: 240 10% 3.9%;
+
+        --popover: 240 15% 97%;
+        --popover-foreground: 240 10% 3.9%;
+
+        --border: 240 5.9% 90%;
+        --input: 240 5.9% 90%;
+        --ring: 213 100% 49%;
+
+        --destructive: 0 84.2% 60.2%;
+        --destructive-foreground: 210 20% 98%;
+
+        /* Gradients */
+        --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+        --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-glow)));
+        --gradient-background: linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted)));
+        --gradient-glass: linear-gradient(135deg, hsl(var(--glass) / 0.6), hsl(var(--glass) / 0.3));
+
+        /* Shadows and glows */
+        --shadow-glass: 0 8px 32px hsl(var(--foreground) / 0.08);
+        --shadow-glow: 0 0 40px hsl(var(--primary) / 0.3);
+        --shadow-glow-secondary: 0 0 40px hsl(var(--secondary) / 0.3);
+        --shadow-elevated: 0 20px 60px hsl(var(--foreground) / 0.12);
+
+        --radius: 0.8rem;
+
+        /* Chart colors for existing functionality */
+        --chart-1: 12 76% 61%;
+        --chart-2: 173 58% 39%;
+        --chart-3: 197 37% 24%;
+        --chart-4: 43 74% 66%;
+        --chart-5: 27 87% 67%;
+    }
+
+    .dark {
+        /* Base colors - dark theme */
+        --background: 240 10% 3.9%;
+        --foreground: 240 5% 98%;
+
+        /* Glassmorphic surfaces */
+        --glass: 240 10% 8%;
+        --glass-foreground: 240 5% 90%;
+        --glass-border: 240 10% 15%;
+
+        /* Primary brand colors with glow variants */
+        --primary: 213 100% 55%;
+        --primary-foreground: 240 10% 3.9%;
+        --primary-glow: 213 100% 70%;
+        --primary-muted: 213 30% 15%;
+
+        /* Secondary futuristic accents */
+        --secondary: 195 100% 60%;
+        --secondary-foreground: 240 10% 3.9%;
+        --secondary-glow: 195 100% 75%;
+        --secondary-muted: 195 50% 12%;
+
+        /* Neutral palette */
+        --muted: 240 3.7% 15.9%;
+        --muted-foreground: 240 5% 64.9%;
+
+        --accent: 240 3.7% 15.9%;
+        --accent-foreground: 240 5% 90%;
+
+        --card: 240 10% 6%;
+        --card-foreground: 240 5% 90%;
+
+        --popover: 240 10% 6%;
+        --popover-foreground: 240 5% 90%;
+
+        --border: 240 3.7% 15.9%;
+        --input: 240 3.7% 15.9%;
+        --ring: 213 100% 55%;
+
+        --destructive: 0 62.8% 50.6%;
+        --destructive-foreground: 240 5% 98%;
+
+        /* Gradients */
+        --gradient-primary: linear-gradient(135deg, hsl(var(--primary)), hsl(var(--primary-glow)));
+        --gradient-secondary: linear-gradient(135deg, hsl(var(--secondary)), hsl(var(--secondary-glow)));
+        --gradient-background: linear-gradient(180deg, hsl(var(--background)), hsl(var(--muted)));
+        --gradient-glass: linear-gradient(135deg, hsl(var(--glass) / 0.4), hsl(var(--glass) / 0.15));
+
+        /* Shadows and glows */
+        --shadow-glass: 0 8px 32px hsl(var(--background) / 0.8);
+        --shadow-glow: 0 0 60px hsl(var(--primary) / 0.4);
+        --shadow-glow-secondary: 0 0 60px hsl(var(--secondary) / 0.4);
+        --shadow-elevated: 0 20px 60px hsl(var(--background) / 0.8);
+
+        /* Chart colors for existing functionality */
+        --chart-1: 220 70% 50%;
+        --chart-2: 160 60% 45%;
+        --chart-3: 30 80% 55%;
+        --chart-4: 280 65% 60%;
+        --chart-5: 340 75% 55%;
+    }
+}
+
+@layer base {
+    * {
+        @apply border-border;
+    }
+
+    body {
+        @apply bg-background text-foreground font-inter;
+        letter-spacing: -0.5px;
+        background: var(--gradient-background);
+        min-height: 100vh;
+    }
+
+    /* Glassmorphism utility classes */
+    .glass {
+        background: var(--gradient-glass);
+        backdrop-filter: blur(2px);
+        border: 1px solid hsl(var(--glass-border));
+        box-shadow: var(--shadow-glass);
+    }
+
+    .glass-card {
+        @apply glass rounded-2xl;
+    }
+
+    .bg-gradient-primary {
+        background: var(--gradient-primary);
+    }
+
+    .glow {
+        box-shadow: var(--shadow-glow);
+    }
+
+    .glow-secondary {
+        box-shadow: var(--shadow-glow-secondary);
+    }
+
+    .elevated {
+        box-shadow: var(--shadow-elevated);
+    }
+
+    /* Typography */
+    .font-inter {
+        font-family: 'Inter', system-ui, sans-serif;
+    }
+
+    /* Animations */
+    .animate-float {
+        animation: float 6s ease-in-out infinite;
+    }
+
+    .animate-glow {
+        animation: glow 2s ease-in-out infinite alternate;
+    }
+
+    @keyframes float {
+
+        0%,
+        100% {
+            transform: translateY(0px);
+        }
+
+        50% {
+            transform: translateY(-20px);
+        }
+    }
+
+    @keyframes glow {
+        from {
+            box-shadow: var(--shadow-glow);
+        }
+
+        to {
+            box-shadow: 0 0 60px hsl(var(--primary) / 0.6);
+        }
+    }
+}
+
+@layer utilities {
+
+    /* Custom animations for auth pages */
+    .animate-fade-in {
+        animation: fadeIn 0.6s ease-out;
+    }
+
+    .animate-scale-in {
+        animation: scaleIn 0.5s ease-out;
+    }
+
+    .animate-fade-in-right {
+        animation: fadeInRight 0.8s ease-out;
+    }
+
+    /* Marquee animations for carousel */
+    .animate-marquee {
+        animation: marquee var(--duration, 40s) linear infinite;
+    }
+
+    .animate-marquee-vertical {
+        animation: marquee-vertical var(--duration, 40s) linear infinite;
+    }
+
+    @keyframes fadeIn {
+        from {
+            opacity: 0;
+            transform: translateY(20px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
+
+    @keyframes scaleIn {
+        from {
+            opacity: 0;
+            transform: scale(0.95);
+        }
+
+        to {
+            opacity: 1;
+            transform: scale(1);
+        }
+    }
+
+    @keyframes fadeInRight {
+        from {
+            opacity: 0;
+            transform: translateX(30px);
+        }
+
+        to {
+            opacity: 1;
+            transform: translateX(0);
+        }
+    }
+
+    @keyframes marquee {
+        from {
+            transform: translateX(0);
+        }
+
+        to {
+            transform: translateX(calc(-100% - var(--gap, 1rem)));
+        }
+    }
+
+    @keyframes marquee-vertical {
+        from {
+            transform: translateY(0);
+        }
+
+        to {
+            transform: translateY(calc(-100% - var(--gap, 1rem)));
+        }
+    }
+}
+
+/* Modern futuristic landing page styles */
+/* Logo styles and animations */
+.logo {
+    will-change: filter;
+    transition: filter 300ms;
+}
+
+.logo:hover {
+    filter: drop-shadow(0 0 2em hsl(var(--primary) / 0.8));
+}
+
+@keyframes logo-spin {
+    from {
+        transform: rotate(0deg);
+    }
+
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+@media (prefers-reduced-motion: no-preference) {
+    .logo.spin {
+        animation: logo-spin infinite 20s linear;
+    }
+}

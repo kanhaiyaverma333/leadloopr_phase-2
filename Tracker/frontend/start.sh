@@ -1,0 +1,1 @@
+npx serve -s dist/ -p 9002

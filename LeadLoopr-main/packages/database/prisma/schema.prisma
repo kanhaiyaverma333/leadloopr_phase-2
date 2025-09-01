@@ -1,0 +1,302 @@
+datasource db {
+  provider = "postgresql"
+  url      = "postgresql://LeadLoopr_owner:npg_bOT8eQWsz5UV@ep-tight-sound-a8m3jp0m-pooler.eastus2.azure.neon.tech/LeadLoopr?sslmode=require"
+}
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/client"
+}
+
+model User {
+  id                    String        @id @default(cuid())
+  clerkId               String        @unique
+  firstName             String?
+  lastName              String?
+  email                 String        @unique
+  imageUrl              String?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+  currentOrganizationId String?
+  currentOrganization   Organization? @relation("CurrentOrg", fields: [currentOrganizationId], references: [id], onDelete: SetNull)
+
+  organizations OrganizationUser[]
+  ownedLeads    Lead[]             @relation("LeadOwner")
+  editedLeads   Lead[]             @relation("LeadLastEditor")
+}
+
+model Organization {
+  id      String  @id @default(cuid())
+  name    String
+  website String?
+
+  users     OrganizationUser[]
+  leads     Lead[]
+  stages    PipelineStage[]
+  createdAt DateTime           @default(now())
+
+  currentUsers User[] @relation("CurrentOrg")
+
+  // ✅ reverse relation to GA4 integration
+  googleAnalyticsIntegration GoogleAnalyticsIntegration?
+}
+
+model OrganizationUser {
+  id             String   @id @default(cuid())
+  userId         String
+  organizationId String
+  role           UserRole @default(MEMBER)
+
+  user         User         @relation(fields: [userId], references: [id])
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, organizationId])
+}
+
+model Lead {
+  id             String @id @default(cuid())
+  organizationId String
+
+  // Identification & Contact
+  name    String?
+  email   String?
+  phone   String?
+  company String?
+
+  // Attribution & Source
+  websiteUrl         String?
+  landingPageUrl     String?
+  path               String?
+  referrerUrl        String?
+  utmSource          String?
+  utmMedium          String?
+  utmCampaign        String?
+  
+  // Google Ads
+  gclid              String?
+  conversionActionId String?
+  
+  // Meta/Facebook
+  fbclid             String?
+  li_fat_id          String?
+  metaFbp            String?
+  metaPixelId        String?
+  metaEventId        String?
+  
+  // Microsoft Ads - NEW
+  msclkid                String?
+  microsoftConversionId  String? // NEW FIELD
+  
+  // Analytics
+  gaClientId         String?
+  gaSessionId        String?
+  firstSeenAt        DateTime?
+
+  // Consent Breakdown
+  consentStatus            ConsentStatus @default(UNKNOWN)
+  consentTimestamp         DateTime?
+  adStorageConsent         Boolean?
+  adUserDataConsent        Boolean?
+  adPersonalizationConsent Boolean?
+  analyticsStorageConsent  Boolean?
+
+  // Qualification & Pipeline
+  currentStageId String?
+  value          Float?
+  currency       String?
+  priority       LeadPriority            @default(MEDIUM)
+  qualification  LeadQualificationStatus @default(UNQUALIFIED)
+  ownerId        String?
+  tags           String[]
+  isManual       Boolean                 @default(false)
+
+  // Device Info
+  clientIpAddress String?
+  clientUserAgent String?
+
+  // Activity
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  lastUpdatedById String?
+  syncedAt        DateTime?
+
+  // Relations
+  organization  Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  stage         PipelineStage?    @relation(fields: [currentStageId], references: [id], onDelete: SetNull)
+  owner         User?             @relation("LeadOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  lastUpdatedBy User?             @relation("LeadLastEditor", fields: [lastUpdatedById], references: [id], onDelete: SetNull)
+  conversions   ConversionEvent[]
+
+  @@index([organizationId])
+  @@index([ownerId])
+  @@index([currentStageId])
+  @@index([msclkid]) // NEW INDEX for Microsoft Click ID
+}
+
+model PipelineStage {
+  id             String @id @default(cuid())
+  organizationId String
+  name           String
+  position       Int
+  color          String @default("bg-blue-500")
+
+  leads        Lead[]
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, name])
+  @@index([organizationId])
+}
+
+model ConversionEvent {
+  id               String             @id @default(cuid())
+  leadId           String
+  platform         ConversionPlatform
+  conversionAction String // Name of the conversion action in the ad platform
+  conversionTime   DateTime
+
+  value    Float?
+  currency String? // ISO 4217 (e.g. "EUR", "USD")
+
+  orderId         String? // For deduplication and reconciliation
+  uploadStatus    UploadStatus @default(PENDING)
+  uploadAttempts  Int          @default(0)
+  lastUploadError String? // Log error messages from API
+  uploadedAt      DateTime?
+
+  // Relation
+  lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
+
+  @@index([leadId])
+  @@index([platform])
+}
+
+model GoogleAdsIntegration {
+  id             String    @id @default(cuid())
+  organizationId String // Clerk org ID
+  accessToken    String
+  refreshToken   String
+  scope          String?
+  expiryDate     DateTime?
+
+  // Additional fields for better management
+  isActive           Boolean @default(true)
+  lastError          String? // Store last error message
+  customerId         String? // Google Ads Customer ID
+  conversionActionId String? // ✅ Add this field
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([organizationId])
+}
+
+model GoogleAnalyticsIntegration {
+  id             String @id @default(cuid())
+  organizationId String @unique
+
+  accessToken  String?
+  refreshToken String?
+  scope        String?
+  expiryDate   DateTime?
+
+  integrationName String?
+  measurementId   String?
+  apiSecret       String?
+
+  isActive     Boolean @default(false)
+  isConfigured Boolean @default(false)
+  lastError    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("google_analytics_integrations")
+}
+
+model MetaAdsIntegration {
+  id             String    @id @default(cuid())
+  organizationId String    @unique // Clerk org ID, one integration per org
+  accessToken    String
+  refreshToken   String?
+  expiryDate     DateTime?
+
+  // Meta Ads-specific fields
+  adAccountId       String?
+  pixelId           String?
+  conversionEventId String? // ✅ optional like GoogleAdsIntegration
+  metadata          String? // JSON string for extra config/events
+
+  // Management fields
+  isActive  Boolean @default(true)
+  lastError String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+// Add this to your schema.prisma file
+
+model MicrosoftAdsIntegration {
+  id               String   @id @default(cuid())
+  organizationId   String   @unique
+  accessToken      String
+  refreshToken     String
+  scope            String?
+  expiryDate       DateTime?
+  accountId        String?  // Microsoft Ads Account ID
+  customerId       String?  // Microsoft Customer ID (required for API calls)
+  conversionGoalId String?  // Default conversion goal ID
+  isActive         Boolean  @default(false)
+  lastError        String?  // Store last error for debugging
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  
+  
+
+  // Relationship to organization
+//  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@map("microsoft_ads_integrations")
+}
+
+
+enum ConsentStatus {
+  GRANTED
+  DENIED
+  PARTIAL
+  UNKNOWN
+}
+
+enum LeadPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum ConversionPlatform {
+  GOOGLE
+  META
+  LINKEDIN
+  MICROSOFT
+}
+
+enum UploadStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  IGNORED
+}
+
+enum LeadQualificationStatus {
+  QUALIFIED
+  UNQUALIFIED
+  NEEDS_REVIEW
+}
+
+enum UserRole {
+  ADMIN
+  MEMBER
+  OWNER
+}
