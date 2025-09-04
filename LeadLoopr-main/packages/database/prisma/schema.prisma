@@ -33,12 +33,83 @@ model Organization {
   users     OrganizationUser[]
   leads     Lead[]
   stages    PipelineStage[]
-  createdAt DateTime           @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt   // ✅ fixed: required + default
 
   currentUsers User[] @relation("CurrentOrg")
 
-  // ✅ reverse relation to GA4 integration
   googleAnalyticsIntegration GoogleAnalyticsIntegration?
+
+  // 🆕 SUBSCRIPTION FIELDS
+  stripeCustomerId       String?            @unique
+  stripeSubscriptionId   String?            @unique
+  stripePriceId          String?
+  subscriptionStatus     SubscriptionStatus @default(TRIAL)
+  subscriptionPeriodEnd  DateTime?
+  trialEndsAt            DateTime?
+  isSubscriptionActive   Boolean            @default(true)
+
+  // Usage tracking
+  currentPeriodLeads     Int @default(0)
+  monthlyLeadLimit       Int @default(100)
+  currentTeamMembers     Int @default(1)
+  maxTeamMembers         Int @default(3)
+
+  // Billing
+  lastBillingDate        DateTime?
+  nextBillingDate        DateTime?
+  billingEmail           String?
+
+  usageMetrics           UsageMetric[]
+}
+
+
+// 🆕 NEW MODEL - Track organization usage for billing
+model UsageMetric {
+  id             String   @id @default(cuid())
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  
+  metricType     UsageType
+  value          Int
+  periodStart    DateTime
+  periodEnd      DateTime
+  createdAt      DateTime @default(now())
+  
+  @@unique([organizationId, metricType, periodStart])
+  @@index([organizationId])
+  @@index([periodStart])
+}
+
+// 🆕 NEW MODEL - Store Stripe events for audit trail
+model StripeEvent {
+  id               String   @id @default(cuid())
+  stripeEventId    String   @unique
+  organizationId   String?
+  eventType        String
+  processed        Boolean  @default(false)
+  data             String   // JSON string of event data
+  createdAt        DateTime @default(now())
+  
+  @@index([organizationId])
+  @@index([eventType])
+}
+
+// 🆕 NEW ENUMS
+enum SubscriptionStatus {
+  TRIAL          // Free 30-day trial (default for new orgs)
+  ACTIVE         // Paid and active
+  PAST_DUE       // Payment failed but grace period
+  CANCELED       // Subscription canceled
+  INCOMPLETE     // Payment setup incomplete
+  EXPIRED        // Trial or subscription expired
+}
+
+enum UsageType {
+  LEADS_PROCESSED
+  TEAM_MEMBERS_ADDED
+  API_CALLS
+  INTEGRATIONS_USED
 }
 
 model OrganizationUser {
@@ -83,9 +154,9 @@ model Lead {
   metaPixelId        String?
   metaEventId        String?
   
-  // Microsoft Ads - NEW
+  // Microsoft Ads
   msclkid                String?
-  microsoftConversionId  String? // NEW FIELD
+  microsoftConversionId  String?
   
   // Analytics
   gaClientId         String?
@@ -130,7 +201,7 @@ model Lead {
   @@index([organizationId])
   @@index([ownerId])
   @@index([currentStageId])
-  @@index([msclkid]) // NEW INDEX for Microsoft Click ID
+  @@index([msclkid])
 }
 
 model PipelineStage {
@@ -151,19 +222,18 @@ model ConversionEvent {
   id               String             @id @default(cuid())
   leadId           String
   platform         ConversionPlatform
-  conversionAction String // Name of the conversion action in the ad platform
+  conversionAction String
   conversionTime   DateTime
 
   value    Float?
-  currency String? // ISO 4217 (e.g. "EUR", "USD")
+  currency String?
 
-  orderId         String? // For deduplication and reconciliation
+  orderId         String?
   uploadStatus    UploadStatus @default(PENDING)
   uploadAttempts  Int          @default(0)
-  lastUploadError String? // Log error messages from API
+  lastUploadError String?
   uploadedAt      DateTime?
 
-  // Relation
   lead Lead @relation(fields: [leadId], references: [id], onDelete: Cascade)
 
   @@index([leadId])
@@ -172,17 +242,16 @@ model ConversionEvent {
 
 model GoogleAdsIntegration {
   id             String    @id @default(cuid())
-  organizationId String // Clerk org ID
+  organizationId String
   accessToken    String
   refreshToken   String
   scope          String?
   expiryDate     DateTime?
 
-  // Additional fields for better management
   isActive           Boolean @default(true)
-  lastError          String? // Store last error message
-  customerId         String? // Google Ads Customer ID
-  conversionActionId String? // ✅ Add this field
+  lastError          String?
+  customerId         String?
+  conversionActionId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -217,26 +286,22 @@ model GoogleAnalyticsIntegration {
 
 model MetaAdsIntegration {
   id             String    @id @default(cuid())
-  organizationId String    @unique // Clerk org ID, one integration per org
+  organizationId String    @unique
   accessToken    String
   refreshToken   String?
   expiryDate     DateTime?
 
-  // Meta Ads-specific fields
   adAccountId       String?
   pixelId           String?
-  conversionEventId String? // ✅ optional like GoogleAdsIntegration
-  metadata          String? // JSON string for extra config/events
+  conversionEventId String?
+  metadata          String?
 
-  // Management fields
   isActive  Boolean @default(true)
   lastError String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 }
-
-// Add this to your schema.prisma file
 
 model MicrosoftAdsIntegration {
   id               String   @id @default(cuid())
@@ -245,22 +310,16 @@ model MicrosoftAdsIntegration {
   refreshToken     String
   scope            String?
   expiryDate       DateTime?
-  accountId        String?  // Microsoft Ads Account ID
-  customerId       String?  // Microsoft Customer ID (required for API calls)
-  conversionGoalId String?  // Default conversion goal ID
+  accountId        String?
+  customerId       String?
+  conversionGoalId String?
   isActive         Boolean  @default(false)
-  lastError        String?  // Store last error for debugging
+  lastError        String?
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
-  
-  
-
-  // Relationship to organization
-//  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
 
   @@map("microsoft_ads_integrations")
 }
-
 
 enum ConsentStatus {
   GRANTED
