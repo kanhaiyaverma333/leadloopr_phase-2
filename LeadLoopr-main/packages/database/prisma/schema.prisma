@@ -50,10 +50,10 @@ model Organization {
   isSubscriptionActive   Boolean            @default(true)
 
   // Usage tracking
-  currentPeriodLeads     Int @default(0)
-  monthlyLeadLimit       Int @default(100)
-  currentTeamMembers     Int @default(1)
-  maxTeamMembers         Int @default(3)
+  //currentPeriodLeads     Int @default(0)
+  //monthlyLeadLimit       Int @default(100)
+  //currentTeamMembers     Int @default(1)
+  //maxTeamMembers         Int @default(3)
 
   // Billing
   lastBillingDate        DateTime?

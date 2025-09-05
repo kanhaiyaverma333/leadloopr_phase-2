@@ -1,6 +1,7 @@
-// lib/subscription-plans.ts
+// lib/subscription-plans.ts (Updated version)
 import { stripe } from '../stripe/stripe';
 import Stripe from 'stripe';
+import { getTrialDaysForPlan, TRIAL_CONFIG } from './trial-config';
 
 export interface SubscriptionPlan {
   id: string;
@@ -8,8 +9,8 @@ export interface SubscriptionPlan {
   name: string;
   price: number;
   currency: string;
-  interval: string;
-  trialDays?: number;
+  interval: string; // Will be "Monthly", "Quartly", or "Yearly"
+  trialDays: number; // Make required, always have a value
   features: string[];
   stripePriceId: string;
   leadLimit: number;
@@ -79,15 +80,16 @@ function mapStripeProductToPlan(
 
   // Extract custom metadata for features and limits
   const metadata = product.metadata || {};
+  const planId = getReadablePlanId(product.name);
   
   return {
-    id: getReadablePlanId(product.name),
+    id: planId,
     productId: product.id,
     name: product.name,
     price: price.unit_amount / 100, // Convert cents to dollars
     currency: price.currency,
-    interval: price.recurring?.interval || 'month',
-    trialDays: price.recurring?.trial_period_days || undefined,
+    interval: metadata.interval || 'Monthly', // ✅ Use "Monthly", "Quartly", "Yearly" from metadata
+    trialDays: getTrialDaysForPlan(planId),
     stripePriceId: price.id,
     features: parseFeatures(metadata.features || product.description || ''),
     leadLimit: parseInt(metadata.leadLimit || '0'),
@@ -109,7 +111,6 @@ function getReadablePlanId(productName: string): string {
 function parseFeatures(featuresString: string): string[] {
   if (!featuresString) return [];
   
-  // Split by newlines, commas, or pipes
   return featuresString
     .split(/[\n,|]/)
     .map(feature => feature.trim())
@@ -127,8 +128,8 @@ function getFallbackPlans(): SubscriptionPlan[] {
       name: 'Starter',
       price: 29,
       currency: 'usd',
-      interval: 'month',
-      trialDays: 30,
+      interval: 'Monthly', // ✅ fallback default
+      trialDays: getTrialDaysForPlan('starter'),
       features: [
         '500 leads per month',
         '5 team members',
@@ -145,8 +146,8 @@ function getFallbackPlans(): SubscriptionPlan[] {
       name: 'Professional',
       price: 79,
       currency: 'usd',
-      interval: 'month',
-      trialDays: 30,
+      interval: 'Monthly', // ✅ fallback default
+      trialDays: getTrialDaysForPlan('professional'),
       features: [
         '2,000 leads per month',
         '15 team members',
@@ -165,8 +166,8 @@ function getFallbackPlans(): SubscriptionPlan[] {
       name: 'Enterprise',
       price: 199,
       currency: 'usd',
-      interval: 'month',
-      trialDays: 30,
+      interval: 'Monthly', // ✅ fallback default
+      trialDays: getTrialDaysForPlan('enterprise'),
       features: [
         'Unlimited leads',
         'Unlimited team members',
@@ -200,15 +201,20 @@ export function clearPlansCache(): void {
 /**
  * API route to fetch plans (for frontend use)
  */
-// app/api/subscription-plans/route.ts
 export async function GET() {
   try {
     const plans = await getSubscriptionPlans();
     
     return Response.json({
+      success: true,
       plans,
+      count: plans.length,
       cached: plansCache !== null,
-      expires: new Date(cacheExpiry).toISOString()
+      expires: new Date(cacheExpiry).toISOString(),
+      trialConfig: {
+        defaultTrialDays: TRIAL_CONFIG.defaultTrialDays,
+        enableTrialOverride: TRIAL_CONFIG.enableTrialOverride
+      }
     });
   } catch (error) {
     console.error('Error in subscription plans API:', error);
@@ -218,65 +224,4 @@ export async function GET() {
     );
   }
 }
-
-
-// // lib/subscription-plans.ts
-
-// export const SUBSCRIPTION_PLANS = {
-//   starter: {
-//     productId: 'prod_SzCaVwBgyWO83S',
-//     name: 'Starter',
-//     price: 29,
-//     currency: 'usd',
-//     interval: 'month',
-//     trialDays: 30,
-//     features: [
-//       '500 leads per month',
-//       '5 team members',
-//       'Basic integrations',
-//       'Email support',
-//     ],
-//     stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_STARTER!, // keep in .env
-//     leadLimit: 500,
-//     teamLimit: 5,
-//   },
-//   professional: {
-//     productId: 'prod_SzCbQy9cRmYeOa',
-//     name: 'Professional',
-//     price: 79,
-//     currency: 'usd',
-//     interval: 'month',
-//     trialDays: 30,
-//     features: [
-//       '2,000 leads per month',
-//       '15 team members',
-//       'All integrations',
-//       'Priority support',
-//       'Advanced analytics',
-//     ],
-//     stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID!,
-//     leadLimit: 2000,
-//     teamLimit: 15,
-//   },
-//   enterprise: {
-//     productId: 'prod_SzCdwzV1WPShQg',
-//     name: 'Enterprise',
-//     price: 199,
-//     currency: 'usd',
-//     interval: 'month',
-//     trialDays: 30,
-//     features: [
-//       'Unlimited leads',
-//       'Unlimited team members',
-//       'Custom integrations',
-//       'Dedicated support',
-//       'White-label options',
-//     ],
-//     stripePriceId: process.env.NEXT_PUBLIC_STRIPE_ENTERPRISE_PRICE_ID!,
-//     leadLimit: -1, // Unlimited
-//     teamLimit: -1, // Unlimited
-//   },
-// } as const;
-
-// export type SubscriptionPlanId = keyof typeof SUBSCRIPTION_PLANS;
-// // "starter" | "professional" | "enterprise"
+  

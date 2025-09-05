@@ -1,9 +1,10 @@
-// app/api/billing/create-checkout-session/route.ts
+// app/api/billing/create-checkout-session/route.ts (Updated)
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { stripe } from '../../../../lib/stripe/stripe';
 import { PrismaClient } from '../../../../../../packages/database/generated/client';
 import { getSubscriptionPlan, SubscriptionPlan } from '../../../../lib/stripe/subscription-plan';
+import { getTrialDaysForPlan } from '../../../../lib/stripe/trial-config';
 
 const prisma = new PrismaClient();
 
@@ -16,7 +17,11 @@ export async function POST(request: NextRequest) {
     }
 
     // 2️⃣ Parse planId from request
-    const { planId } = (await request.json()) as { planId: string };
+    const { planId, customTrialDays } = (await request.json()) as { 
+      planId: string; 
+      customTrialDays?: number; 
+    };
+    
     if (!planId) {
       return NextResponse.json({ error: 'Missing plan ID' }, { status: 400 });
     }
@@ -34,12 +39,21 @@ export async function POST(request: NextRequest) {
     });
 
     if (!user || !user.currentOrganization) {
-      return NextResponse.json({ error: 'User or organization not found' }, { status: 404 });
+      return NextResponse.json({ 
+        error: 'User or organization not found' 
+      }, { status: 404 });
     }
 
     const organization = user.currentOrganization;
 
-    // 5️⃣ Create or reuse Stripe customer
+    // 5️⃣ Check if user already has an active subscription
+    if (organization.isSubscriptionActive && organization.subscriptionStatus === 'ACTIVE') {
+      return NextResponse.json({ 
+        error: 'Organization already has an active subscription' 
+      }, { status: 400 });
+    }
+
+    // 6️⃣ Create or reuse Stripe customer
     let stripeCustomerId = organization.stripeCustomerId;
     if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
@@ -59,8 +73,11 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 6️⃣ Create Checkout Session
-    const checkoutSession = await stripe.checkout.sessions.create({
+    // 7️⃣ Determine trial days (allow override if needed)
+    const trialDays = customTrialDays || plan.trialDays;
+
+    // 8️⃣ Create Checkout Session
+    const checkoutSessionData: any = {
       customer: stripeCustomerId,
       payment_method_types: ['card'],
       line_items: [
@@ -70,30 +87,40 @@ export async function POST(request: NextRequest) {
         },
       ],
       mode: 'subscription',
-      subscription_data: {
-        trial_period_days: plan.trialDays ?? 30,
-        metadata: {
-          organizationId: organization.id,
-          planId: plan.id,
-        },
-      },
       success_url: `${process.env.NEXT_PUBLIC_APP_URL}/dashboard?subscription=success`,
       cancel_url: `${process.env.NEXT_PUBLIC_APP_URL}/subscription?cancelled=true`,
       metadata: {
         organizationId: organization.id,
         planId: plan.id,
+        trialDays: trialDays.toString(),
       },
-    });
+    };
+
+    // Add trial period if applicable
+    if (trialDays > 0) {
+      checkoutSessionData.subscription_data = {
+        trial_period_days: trialDays,
+        metadata: {
+          organizationId: organization.id,
+          planId: plan.id,
+        },
+      };
+    }
+
+    const checkoutSession = await stripe.checkout.sessions.create(checkoutSessionData);
 
     return NextResponse.json({
       url: checkoutSession.url,
       sessionId: checkoutSession.id,
+      trialDays: trialDays,
+      planName: plan.name,
     });
+    
   } catch (error: any) {
-  console.error('Error creating checkout session:', error);
-  return NextResponse.json(
-    { error: error.message || 'Failed to create checkout session', details: error },
-    { status: 500 }
-  );
-}
+    console.error('Error creating checkout session:', error);
+    return NextResponse.json(
+      { error: error.message || 'Failed to create checkout session', details: error },
+      { status: 500 }
+    );
+  }
 }

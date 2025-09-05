@@ -1,5 +1,5 @@
-// lib/subscription-check.ts
-// lib/subscription-check.ts
+// lib/stripe/subscription-check.ts
+
 import { PrismaClient ,SubscriptionStatus} from "../../../../packages/database/generated/client";
 
 
