@@ -5,9 +5,7 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { ScrollArea } from "../marketing/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
+
 import { CreditCard, Crown, AlertCircle, Clock, CheckCircle, FileText, Download, ExternalLink, Calendar } from "lucide-react";
 
 interface BillingData {
@@ -75,6 +73,9 @@ export function BillingCard() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
+  // Missing state variables added:
+  const [showCancelModal, setShowCancelModal] = useState(false);
+  const [cancelLoading, setCancelLoading] = useState(false);
 
   const fetchBillingData = async () => {
     try {
@@ -108,6 +109,49 @@ export function BillingCard() {
       setBillingHistory({ invoices: [], hasMore: false, total: 0 });
     } finally {
       setHistoryLoading(false);
+    }
+  };
+
+  // Missing function added:
+  const handleCancelSubscription = async (immediate: boolean = false) => {
+    try {
+      setCancelLoading(true);
+      
+      // Log what we're sending
+      console.log('Sending cancellation request:', { cancelImmediately: immediate });
+      
+      const response = await fetch('/api/billing/cancel-subscription', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ 
+          cancelImmediately: immediate,
+          reason: immediate ? 'User requested immediate cancellation' : 'User requested cancellation at period end'
+        }),
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+        throw new Error(errorData.error || 'Failed to cancel subscription');
+      }
+      
+      const result = await response.json();
+      console.log('Cancellation response:', result);
+      
+      // Refresh billing data after cancellation
+      await fetchBillingData();
+      setShowCancelModal(false);
+      
+      // You might want to show a success toast here
+      // toast.success(result.message);
+      
+    } catch (err) {
+      console.error('Error cancelling subscription:', err);
+      // You might want to show an error toast here
+      // toast.error(err.message || 'Failed to cancel subscription');
+    } finally {
+      setCancelLoading(false);
     }
   };
 
@@ -505,11 +549,95 @@ export function BillingCard() {
                 </div>
               </div>
             )}
+
+            {/* Cancel Subscription Modal */}
+            {showCancelModal && (
+              <div 
+                className="fixed inset-0 z-50 flex items-center justify-center"
+                style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+                onClick={() => setShowCancelModal(false)}
+              >
+                <div 
+                  className="bg-white dark:bg-gray-800 rounded-lg max-w-md w-full mx-4 p-6"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-lg font-semibold text-red-600">Cancel Subscription</h3>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowCancelModal(false)}
+                      className="h-8 w-8 p-0"
+                    >
+                      ✕
+                    </Button>
+                  </div>
+
+                  <div className="space-y-4">
+                    <p className="text-sm text-muted-foreground">
+                      Are you sure you want to cancel your subscription? You have two options:
+                    </p>
+
+                    <div className="space-y-3">
+                      <div className="p-3 border rounded-lg">
+                        <h4 className="font-medium mb-1">Cancel at period end (Recommended)</h4>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Keep access until your current billing period ends, then cancel automatically.
+                        </p>
+                        <Button
+                          variant="outline"
+                          onClick={() => handleCancelSubscription(false)}
+                          disabled={cancelLoading}
+                          className="w-full"
+                        >
+                          {cancelLoading ? 'Cancelling...' : 'Cancel at Period End'}
+                        </Button>
+                      </div>
+
+                      <div className="p-3 border border-red-200 rounded-lg">
+                        <h4 className="font-medium mb-1 text-red-600">Cancel immediately</h4>
+                        <p className="text-sm text-muted-foreground mb-3">
+                          Lose access immediately. You may receive a prorated refund for unused time.
+                        </p>
+                        <Button
+                          variant="destructive"
+                          onClick={() => handleCancelSubscription(true)}
+                          disabled={cancelLoading}
+                          className="w-full"
+                        >
+                          {cancelLoading ? 'Cancelling...' : 'Cancel Immediately'}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="pt-3 border-t">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowCancelModal(false)}
+                        className="w-full"
+                        disabled={cancelLoading}
+                      >
+                        Keep Subscription
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {subscription.isActive ? (
-              <Button variant="outline" className="w-full glass justify-start">
-                Change Plan
-              </Button>
+              <div className="space-y-2">
+                <Button variant="outline" className="w-full glass justify-start">
+                  Change Plan
+                </Button>
+                <Button 
+                  variant="outline" 
+                  className="w-full glass justify-start text-red-600 hover:text-red-700"
+                  onClick={() => setShowCancelModal(true)}
+                >
+                  Cancel Subscription
+                </Button>
+              </div>
             ) : (
               <Button className="w-full bg-gradient-primary text-white">
                 Subscribe Now
