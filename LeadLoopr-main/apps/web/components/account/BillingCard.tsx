@@ -5,7 +5,10 @@ import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CreditCard, Crown, AlertCircle, Clock, CheckCircle } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { ScrollArea } from "../marketing/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { CreditCard, Crown, AlertCircle, Clock, CheckCircle, FileText, Download, ExternalLink, Calendar } from "lucide-react";
 
 interface BillingData {
   subscription: {
@@ -42,10 +45,36 @@ interface BillingData {
   };
 }
 
+interface BillingHistoryItem {
+  id: string;
+  invoiceNumber: string | null;
+  amount: number;
+  currency: string;
+  status: string;
+  paidAt: string | null;
+  createdAt: string;
+  periodStart: string | null;
+  periodEnd: string | null;
+  description: string;
+  downloadUrl: string | null;
+  hostedUrl: string | null;
+  paymentStatus: string;
+  dueDate: string | null;
+}
+
+interface BillingHistory {
+  invoices: BillingHistoryItem[];
+  hasMore: boolean;
+  total: number;
+}
+
 export function BillingCard() {
   const [billingData, setBillingData] = useState<BillingData | null>(null);
+  const [billingHistory, setBillingHistory] = useState<BillingHistory | null>(null);
   const [loading, setLoading] = useState(true);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showHistory, setShowHistory] = useState(false);
 
   const fetchBillingData = async () => {
     try {
@@ -64,6 +93,31 @@ export function BillingCard() {
     }
   };
 
+  const fetchBillingHistory = async () => {
+    try {
+      setHistoryLoading(true);
+      const response = await fetch('/api/billing/history');
+      if (!response.ok) {
+        throw new Error('Failed to fetch billing history');
+      }
+      const data = await response.json();
+      setBillingHistory(data);
+    } catch (err) {
+      console.error('Error fetching billing history:', err);
+      // Set empty history on error
+      setBillingHistory({ invoices: [], hasMore: false, total: 0 });
+    } finally {
+      setHistoryLoading(false);
+    }
+  };
+
+  const handleViewHistory = async () => {
+    setShowHistory(true);
+    if (!billingHistory) {
+      await fetchBillingHistory();
+    }
+  };
+
   useEffect(() => {
     fetchBillingData();
   }, []);
@@ -72,7 +126,7 @@ export function BillingCard() {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency.toUpperCase(),
-    }).format(price);
+    }).format(price / 100); // Stripe amounts are in cents
   };
 
   const formatDate = (dateString: string | null) => {
@@ -151,6 +205,21 @@ export function BillingCard() {
     return 'Billing date not available';
   };
 
+  const getPaymentStatusBadge = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'paid':
+        return <Badge className="bg-green-100 text-green-800 border-green-200">Paid</Badge>;
+      case 'pending':
+        return <Badge className="bg-yellow-100 text-yellow-800 border-yellow-200">Pending</Badge>;
+      case 'failed':
+        return <Badge variant="destructive">Failed</Badge>;
+      case 'canceled':
+        return <Badge variant="secondary">Canceled</Badge>;
+      default:
+        return <Badge variant="outline">{status}</Badge>;
+    }
+  };
+
   if (loading) {
     return (
       <motion.div
@@ -172,7 +241,6 @@ export function BillingCard() {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="animate-pulse">
-              {/* Current Plan Skeleton */}
               <div className="p-4 rounded-lg border border-primary/20 bg-gradient-primary/5">
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-2">
@@ -185,8 +253,6 @@ export function BillingCard() {
                 <div className="h-4 bg-muted rounded w-48 mb-1"></div>
                 <div className="h-4 bg-muted rounded w-40"></div>
               </div>
-
-              {/* Actions Skeleton */}
               <div className="space-y-2 mt-6">
                 <div className="h-10 bg-muted rounded w-full"></div>
                 <div className="h-10 bg-muted rounded w-full"></div>
@@ -275,7 +341,7 @@ export function BillingCard() {
                 <p className="text-2xl font-bold mb-1">
                   {trialInfo?.isActive 
                     ? 'Free Trial' 
-                    : `${formatPrice(plan.price, plan.currency)}/${plan.interval.toLowerCase()}`
+                    : `${formatPrice(plan.price * 100, plan.currency)}/${plan.interval.toLowerCase()}`
                   }
                 </p>
                 <p className="text-sm text-muted-foreground">
@@ -291,27 +357,6 @@ export function BillingCard() {
               </p>
             )}
           </div>
-
-          {/* Usage Stats */}
-          {/* {subscription.isActive && (
-            <div className="space-y-3">
-              <h4 className="font-medium">Current Usage</h4>
-              <div className="space-y-2">
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Leads this period</span>
-                  <span className="text-sm font-medium">
-                    {usage.currentLeads} / {usage.leadLimit === -1 ? '∞' : usage.leadLimit}
-                  </span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-sm text-muted-foreground">Team members</span>
-                  <span className="text-sm font-medium">
-                    {usage.teamMembers} / {usage.teamLimit === -1 ? '∞' : usage.teamLimit}
-                  </span>
-                </div>
-              </div>
-            </div>
-          )} */}
 
           {/* Payment Method */}
           {paymentMethod && subscription.isActive && (
@@ -340,9 +385,127 @@ export function BillingCard() {
 
           {/* Billing Actions */}
           <div className="space-y-2">
-            <Button variant="outline" className="w-full glass justify-start">
+            <Button 
+              variant="outline" 
+              className="w-full glass justify-start"
+              onClick={handleViewHistory}
+            >
+              <FileText className="h-4 w-4 mr-2" />
               View Billing History
             </Button>
+            
+            {/* Billing History Modal */}
+            {showHistory && (
+              <div 
+                className="fixed inset-0 z-50 flex items-center justify-center"
+                style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+                onClick={() => setShowHistory(false)}
+              >
+                <div 
+                  className="bg-white dark:bg-gray-800 rounded-lg max-w-4xl max-h-[80vh] w-full mx-4 flex flex-col"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div className="flex items-center justify-between p-6 border-b">
+                    <h2 className="text-xl font-semibold flex items-center gap-2">
+                      <FileText className="h-5 w-5" />
+                      Billing History
+                    </h2>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setShowHistory(false)}
+                      className="h-8 w-8 p-0"
+                    >
+                      ✕
+                    </Button>
+                  </div>
+
+                  {/* Content */}
+                  <div className="flex-1 overflow-y-auto p-6">
+                    {historyLoading ? (
+                      <div className="flex items-center justify-center py-8">
+                        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                      </div>
+                    ) : billingHistory?.invoices.length === 0 ? (
+                      <div className="text-center py-8 text-muted-foreground">
+                        <FileText className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                        <p>No billing history available</p>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {billingHistory?.invoices.map((invoice, index) => (
+                          <div key={invoice.id} className="border rounded-lg p-4 space-y-3">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div>
+                                  <p className="font-medium">
+                                    {invoice.invoiceNumber || `Invoice ${invoice.id.slice(-8)}`}
+                                  </p>
+                                  <p className="text-sm text-muted-foreground">
+                                    {invoice.description}
+                                  </p>
+                                </div>
+                              </div>
+                              <div className="text-right">
+                                <p className="font-semibold">
+                                  {formatPrice(invoice.amount, invoice.currency)}
+                                </p>
+                                {getPaymentStatusBadge(invoice.paymentStatus)}
+                              </div>
+                            </div>
+                            
+                            <div className="flex items-center justify-between text-sm text-muted-foreground">
+                              <div className="flex items-center gap-4">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>{formatDate(invoice.createdAt)}</span>
+                                </div>
+                                {invoice.paidAt && (
+                                  <span>Paid {formatDate(invoice.paidAt)}</span>
+                                )}
+                              </div>
+                              
+                              <div className="flex items-center gap-2">
+                                {invoice.downloadUrl && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => window.open(invoice.downloadUrl!, '_blank')}
+                                  >
+                                    <Download className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {invoice.hostedUrl && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => window.open(invoice.hostedUrl!, '_blank')}
+                                  >
+                                    <ExternalLink className="h-4 w-4" />
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+
+                            {invoice.periodStart && invoice.periodEnd && (
+                              <>
+                                <div className="border-t pt-2 mt-2">
+                                  <p className="text-xs text-muted-foreground">
+                                    Service Period: {formatDate(invoice.periodStart)} - {formatDate(invoice.periodEnd)}
+                                  </p>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
+            
             {subscription.isActive ? (
               <Button variant="outline" className="w-full glass justify-start">
                 Change Plan

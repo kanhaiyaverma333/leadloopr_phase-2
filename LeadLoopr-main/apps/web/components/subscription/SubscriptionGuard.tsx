@@ -1,102 +1,116 @@
-// components/subscription/SubscriptionGuard.tsx
-'use client';
+'use client'
 
-import { useState, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
-import { useUser } from '@clerk/nextjs';
-import { Button } from '@/components/ui/button';
-import { AlertTriangle, CreditCard } from 'lucide-react';
+import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
+import { Loader2, AlertCircle } from 'lucide-react'
+import SubscriptionPage from '@/app/subscription/page' // Adjust path as needed
 
 interface SubscriptionStatus {
   hasActiveSubscription: boolean;
-  subscriptionStatus: string;
+  subscriptionStatus: 'ACTIVE' | 'TRIAL' | 'PAST_DUE' | 'EXPIRED';
   trialExpired: boolean;
   daysLeftInTrial?: number;
 }
 
 interface SubscriptionGuardProps {
-  children: React.ReactNode;
+  children: React.ReactNode
 }
 
 export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
-  const { user, isLoaded } = useUser();
-  const router = useRouter();
-  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const router = useRouter()
 
   useEffect(() => {
-    async function checkSubscription() {
-      if (!isLoaded || !user) return;
+    checkSubscriptionStatus()
+  }, [])
 
-      try {
-        const response = await fetch('/api/billing/subscription-status');
-        const data = await response.json();
-        
-        if (response.ok) {
-          setSubscriptionStatus(data);
-          
-          // If no active subscription and trial expired, redirect to subscription page
-          if (!data.hasActiveSubscription && data.trialExpired) {
-            router.push('/subscription');
-            return;
-          }
+  const checkSubscriptionStatus = async () => {
+    try {
+      setLoading(true)
+      setError(null)
+      
+      const response = await fetch('/api/billing/subscription-status', {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        cache: 'no-store' // Ensure fresh data
+      })
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          // User is not authenticated, redirect to login
+          router.push('/sign-in')
+          return
         }
-      } catch (error) {
-        console.error('Error checking subscription:', error);
-        // On error, redirect to subscription page as safety measure
-        router.push('                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                               /subscription');
-      } finally {
-        setLoading(false);
+        throw new Error(`Failed to fetch subscription status: ${response.status}`)
       }
+
+      const data = await response.json()
+      setSubscriptionStatus(data)
+    } catch (err) {
+      console.error('Error checking subscription status:', err)
+      setError(err instanceof Error ? err.message : 'Failed to check subscription status')
+    } finally {
+      setLoading(false)
     }
-
-    checkSubscription();
-  }, [user, isLoaded, router]);
-
-  // Show loading state
-  if (loading || !isLoaded) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500 mx-auto mb-4"></div>
-          <p className="text-muted-foreground">Checking subscription...</p>
-        </div>
-      </div>
-    );
   }
 
-  // Show trial warning if user is in trial with few days left
-  if (
-    subscriptionStatus?.hasActiveSubscription && 
-    subscriptionStatus?.subscriptionStatus === 'TRIAL' && 
-    subscriptionStatus?.daysLeftInTrial !== undefined && 
-    subscriptionStatus.daysLeftInTrial <= 3
-  ) {
+  // Show loading state while checking subscription
+  if (loading) {
     return (
-      <div className="min-h-screen bg-background">
-        <div className="bg-yellow-50 border-b border-yellow-200 p-4">
-          <div className="max-w-7xl mx-auto flex items-center justify-between">
-            <div className="flex items-center space-x-3">
-              <AlertTriangle className="w-5 h-5 text-yellow-600" />
-              <span className="text-yellow-800 font-medium">
-                Your trial expires in {subscriptionStatus.daysLeftInTrial} day{subscriptionStatus.daysLeftInTrial !== 1 ? 's' : ''}
-              </span>
-            </div>
-            <Button
-              onClick={() => router.push('/subscription')}
-              size="sm"
-              className="bg-yellow-600 hover:bg-yellow-700 text-white"
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-background to-background/50">
+        <div className="text-center">
+          <div className="relative mb-4">
+            <Loader2 className="h-12 w-12 animate-spin text-primary mx-auto" />
+            <div className="absolute inset-0 h-12 w-12 bg-primary/20 rounded-full blur-xl animate-pulse" />
+          </div>
+          <h2 className="text-lg font-medium mb-2">Loading Dashboard...</h2>
+          <p className="text-sm text-muted-foreground">Checking your subscription status</p>
+        </div>
+      </div>
+    )
+  }
+
+  // Show error state with retry option
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-background to-background/50">
+        <div className="text-center max-w-md px-4">
+          <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold mb-2">Unable to Load Dashboard</h2>
+          <p className="text-muted-foreground mb-6">{error}</p>
+          <div className="flex gap-3 justify-center">
+            <button
+              onClick={checkSubscriptionStatus}
+              className="px-6 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg shadow-md hover:opacity-90 transition-opacity"
             >
-              <CreditCard className="w-4 h-4 mr-2" />
-              Upgrade Now
-            </Button>
+              Try Again
+            </button>
+            <button
+              onClick={() => router.push('/sign-in')}
+              className="px-6 py-2 border border-input bg-background hover:bg-accent hover:text-accent-foreground rounded-lg transition-colors"
+            >
+              Sign In Again
+            </button>
           </div>
         </div>
-        {children}
       </div>
-    );
+    )
   }
 
-  // If we reach here, user has active subscription or valid trial
-  return <>{children}</>;
+  // Check if user has active subscription or trial
+  if (subscriptionStatus && !subscriptionStatus.hasActiveSubscription) {
+    // User needs to subscribe - show subscription page inline
+    return (
+      <div className="min-h-screen bg-gradient-to-b from-background to-background/50">
+        <SubscriptionPage />
+      </div>
+    )
+  }
+
+  // User has active subscription - show dashboard
+  return <>{children}</>
 }

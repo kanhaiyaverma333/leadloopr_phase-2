@@ -1,7 +1,7 @@
 // app/dashboard/layout.tsx
 import { AppSidebar } from "@/components/layout/app-sidebar";
 import { OrganizationCheck } from "@/components/organization/OrganizationCheck";
-import { SubscriptionGuard } from "@/components/subscription/SubscriptionGuard";
+import { SubscriptionGuard } from "@/components/subscription/SubscriptionGuard"; // Updated component
 
 export default function DashboardLayout({
     children,
