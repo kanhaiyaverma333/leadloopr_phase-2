@@ -139,6 +139,7 @@ export function BillingCard() {
       
       await fetchBillingData();
       setShowCancelModal(false);
+       window.location.reload();
       
     } catch (err) {
       console.error('Error cancelling subscription:', err);

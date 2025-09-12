@@ -82,13 +82,13 @@ const UpdateCard = () => {
         <p className="text-red-500 text-sm bg-red-100 p-2 rounded">{errorMessage}</p>
       )}
 
-      <Button
+      {/* <Button
         onClick={handleUpdateCard}
         disabled={!stripe || loading}
         className={`w-full ${!stripe || loading ? "bg-gray-300 cursor-not-allowed" : "bg-blue-600 hover:bg-blue-700"} text-white font-semibold py-2  transition-colors`}
       >
         {loading ? "Updating..." : "Update Card"}
-      </Button>
+      </Button> */}
     </div>
   );
 };
