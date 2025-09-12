@@ -27,7 +27,8 @@ export async function POST(request: NextRequest) {
             stripeCustomerId: true,
             stripeSubscriptionId: true,
             subscriptionStatus: true,
-            isSubscriptionActive: true
+            isSubscriptionActive: true,
+            cancelAtPeriodEnd: true // Include the new field
           }
         }
       }
@@ -41,6 +42,13 @@ export async function POST(request: NextRequest) {
 
     if (!organization.stripeSubscriptionId || !organization.isSubscriptionActive) {
       return NextResponse.json({ error: 'No active subscription found' }, { status: 400 });
+    }
+
+    // Check if subscription is already scheduled for cancellation
+    if (organization.cancelAtPeriodEnd && !cancelImmediately) {
+      return NextResponse.json({ 
+        error: 'Subscription is already scheduled for cancellation at period end' 
+      }, { status: 400 });
     }
 
     let canceledSubscription: Stripe.Subscription;
@@ -75,20 +83,23 @@ export async function POST(request: NextRequest) {
     // Update database based on cancellation type
     let updateData: any = {};
     if (cancelImmediately) {
+      // Immediate cancellation - set status to CANCELED and deactivate
       updateData = {
         subscriptionStatus: 'CANCELED',
         isSubscriptionActive: false,
+        cancelAtPeriodEnd: false, // Reset this field
         stripeSubscriptionId: null,
         stripePriceId: null,
         nextBillingDate: null,
         subscriptionPeriodEnd: null
       };
     } else {
-      // For period end cancellation, keep subscription active but remove next billing date
+      // Period end cancellation - keep ACTIVE status but set flag
       updateData = {
-        nextBillingDate: null,
-        // Optionally set a flag to indicate it's scheduled for cancellation
-        subscriptionStatus: 'ACTIVE_CANCEL_AT_PERIOD_END' // You might need to add this status to your enum
+        cancelAtPeriodEnd: true, // Set the new flag
+        nextBillingDate: null, // Remove next billing since it's scheduled for cancellation
+        // Keep subscriptionStatus as ACTIVE since subscription is still active until period end
+        // Keep isSubscriptionActive as true since user still has access
       };
     }
 
@@ -100,13 +111,12 @@ export async function POST(request: NextRequest) {
     console.log('Organization updated after subscription cancellation:', updateData);
 
     // Calculate end date for period-end cancellations
-   let endsAt: string | null = null;
-const periodEnd = canceledSubscription.items.data[0].current_period_end;
-if (!cancelImmediately && periodEnd !== null && periodEnd !== undefined) {
-  endsAt = new Date(periodEnd * 1000).toISOString();
-}
+    let endsAt: string | null = null;
+    if (canceledSubscription.items.data[0].current_period_end) {
+      endsAt = new Date(canceledSubscription.items.data[0].current_period_end * 1000).toISOString();
+    }
 
-    // Send the response (removed duplicate return)
+    // Send the response
     return NextResponse.json({
       success: true,
       cancelled: true,

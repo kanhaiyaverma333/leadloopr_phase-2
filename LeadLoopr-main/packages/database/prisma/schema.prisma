@@ -34,13 +34,13 @@ model Organization {
   leads     Lead[]
   stages    PipelineStage[]
   createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt   // ✅ fixed: required + default
+  updatedAt DateTime @default(now()) @updatedAt
 
   currentUsers User[] @relation("CurrentOrg")
 
   googleAnalyticsIntegration GoogleAnalyticsIntegration?
 
-  // 🆕 SUBSCRIPTION FIELDS
+  // SUBSCRIPTION FIELDS
   stripeCustomerId       String?            @unique
   stripeSubscriptionId   String?            @unique
   stripePriceId          String?
@@ -48,12 +48,7 @@ model Organization {
   subscriptionPeriodEnd  DateTime?
   trialEndsAt            DateTime?
   isSubscriptionActive   Boolean            @default(true)
-
-  // Usage tracking
-  //currentPeriodLeads     Int @default(0)
-  //monthlyLeadLimit       Int @default(100)
-  //currentTeamMembers     Int @default(1)
-  //maxTeamMembers         Int @default(3)
+  cancelAtPeriodEnd      Boolean            @default(false)  // NEW FIELD
 
   // Billing
   lastBillingDate        DateTime?
@@ -63,8 +58,7 @@ model Organization {
   usageMetrics           UsageMetric[]
 }
 
-
-// 🆕 NEW MODEL - Track organization usage for billing
+// Track organization usage for billing
 model UsageMetric {
   id             String   @id @default(cuid())
   organizationId String
@@ -81,7 +75,7 @@ model UsageMetric {
   @@index([periodStart])
 }
 
-// 🆕 NEW MODEL - Store Stripe events for audit trail
+// Store Stripe events for audit trail
 model StripeEvent {
   id               String   @id @default(cuid())
   stripeEventId    String   @unique
@@ -95,7 +89,6 @@ model StripeEvent {
   @@index([eventType])
 }
 
-// 🆕 NEW ENUMS
 enum SubscriptionStatus {
   TRIAL          // Free 30-day trial (default for new orgs)
   ACTIVE         // Paid and active

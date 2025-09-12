@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 
-import { CreditCard, Crown, AlertCircle, Clock, CheckCircle, FileText, Download, ExternalLink, Calendar } from "lucide-react";
+import { CreditCard, Crown, AlertCircle, Clock, CheckCircle, FileText, Download, ExternalLink, Calendar, AlertTriangle } from "lucide-react";
+import UpdateCard from "./UpdateCard";
 
 interface BillingData {
   subscription: {
@@ -15,6 +16,7 @@ interface BillingData {
     periodEnd: string | null;
     nextBillingDate: string | null;
     lastBillingDate: string | null;
+    cancelAtPeriodEnd?: boolean; // NEW FIELD
   };
   plan: {
     name: string;
@@ -73,7 +75,6 @@ export function BillingCard() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showHistory, setShowHistory] = useState(false);
-  // Missing state variables added:
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [cancelLoading, setCancelLoading] = useState(false);
 
@@ -105,19 +106,16 @@ export function BillingCard() {
       setBillingHistory(data);
     } catch (err) {
       console.error('Error fetching billing history:', err);
-      // Set empty history on error
       setBillingHistory({ invoices: [], hasMore: false, total: 0 });
     } finally {
       setHistoryLoading(false);
     }
   };
 
-  // Missing function added:
   const handleCancelSubscription = async (immediate: boolean = false) => {
     try {
       setCancelLoading(true);
       
-      // Log what we're sending
       console.log('Sending cancellation request:', { cancelImmediately: immediate });
       
       const response = await fetch('/api/billing/cancel-subscription', {
@@ -139,17 +137,11 @@ export function BillingCard() {
       const result = await response.json();
       console.log('Cancellation response:', result);
       
-      // Refresh billing data after cancellation
       await fetchBillingData();
       setShowCancelModal(false);
       
-      // You might want to show a success toast here
-      // toast.success(result.message);
-      
     } catch (err) {
       console.error('Error cancelling subscription:', err);
-      // You might want to show an error toast here
-      // toast.error(err.message || 'Failed to cancel subscription');
     } finally {
       setCancelLoading(false);
     }
@@ -170,7 +162,7 @@ export function BillingCard() {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
       currency: currency.toUpperCase(),
-    }).format(price / 100); // Stripe amounts are in cents
+    }).format(price / 100);
   };
 
   const formatDate = (dateString: string | null) => {
@@ -192,6 +184,16 @@ export function BillingCard() {
         <Badge className="bg-blue-100 text-blue-800 border-blue-200">
           <Clock className="h-3 w-3 mr-1" />
           Trial ({trialInfo.daysLeft} days left)
+        </Badge>
+      );
+    }
+
+    // Handle period-end cancellation status
+    if (subscription.cancelAtPeriodEnd && subscription.status === 'ACTIVE') {
+      return (
+        <Badge className="bg-orange-100 text-orange-800 border-orange-200">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          Cancelling at period end
         </Badge>
       );
     }
@@ -240,6 +242,11 @@ export function BillingCard() {
     
     if (trialInfo?.isActive) {
       return `Trial ends ${formatDate(trialInfo.endsAt)}`;
+    }
+    
+    // Show period end date if subscription is set to cancel
+    if (subscription.cancelAtPeriodEnd && subscription.periodEnd) {
+      return `Subscription ends ${formatDate(subscription.periodEnd)}`;
     }
     
     if (subscription.nextBillingDate) {
@@ -388,9 +395,9 @@ export function BillingCard() {
                     : `${formatPrice(plan.price * 100, plan.currency)}/${plan.interval.toLowerCase()}`
                   }
                 </p>
-                <p className="text-sm text-muted-foreground">
+                {/* <p className="text-sm text-muted-foreground">
                   {plan.leadLimit === -1 ? 'Unlimited' : plan.leadLimit} leads • {plan.teamLimit === -1 ? 'Unlimited' : plan.teamLimit} team members
-                </p>
+                </p> */}
                 <p className="text-sm text-muted-foreground mt-1">
                   {getBillingText()}
                 </p>
@@ -406,7 +413,7 @@ export function BillingCard() {
           {paymentMethod && subscription.isActive && (
             <div>
               <h4 className="font-medium mb-3">Payment Method</h4>
-              <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 glass">
+              {/* <div className="flex items-center justify-between p-3 rounded-lg border border-border/50 glass">
                 <div className="flex items-center gap-3">
                   <div className="h-8 w-12 bg-gradient-primary rounded flex items-center justify-center">
                     <span className="text-xs font-bold text-primary-foreground">
@@ -423,7 +430,9 @@ export function BillingCard() {
                 <Button variant="outline" size="sm" className="glass">
                   Update
                 </Button>
-              </div>
+              
+              </div> */}
+                <UpdateCard/>
             </div>
           )}
 
@@ -627,9 +636,9 @@ export function BillingCard() {
             
             {subscription.isActive ? (
               <div className="space-y-2">
-                <Button variant="outline" className="w-full glass justify-start">
+                {/* <Button variant="outline" className="w-full glass justify-start">
                   Change Plan
-                </Button>
+                </Button> */}
                 <Button 
                   variant="outline" 
                   className="w-full glass justify-start text-red-600 hover:text-red-700"

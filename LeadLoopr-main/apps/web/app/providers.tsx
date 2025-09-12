@@ -1,16 +1,21 @@
 "use client";
 
-import { ReactNode, useState } from "react";
+import { ReactNode } from "react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "sonner";
-// (optional) bring other client-only providers here later (Tooltip, QueryClient, etc.)
+import { Elements } from "@stripe/react-stripe-js";
+import { loadStripe } from "@stripe/stripe-js";
+
+// Load Stripe using your publishable key
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 export default function Providers({ children }: { children: ReactNode }) {
-    // nothing fancy needed—ThemeProvider must be in a client component
-    return (
-        <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-            {children}
-            <Toaster />
-        </ThemeProvider>
-    );
+  return (
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
+      <Elements stripe={stripePromise}>
+        {children}
+      </Elements>
+      <Toaster />
+    </ThemeProvider>
+  );
 }
