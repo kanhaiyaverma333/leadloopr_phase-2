@@ -1,6 +1,7 @@
 // hooks/useLeadsData.ts
 import { useQuery } from '@tanstack/react-query';
 import React from 'react';
+import { useTimeFilter } from '@/components/dashboard/contexts/TimeFilterContext';
 
 export interface Lead {
   id: string;
@@ -36,6 +37,37 @@ export interface LeadsResponse {
   leads: Lead[];
 }
 
+// Helper function to determine lead source
+const getLeadSource = (lead: Lead) => {
+  if (lead.gclid || lead.utmSource?.toLowerCase().includes('google')) {
+    return { name: 'Google Ads', icon: '🎯', color: 'bg-blue-500' };
+  }
+  if (lead.fbclid || lead.utmSource?.toLowerCase().includes('facebook') || lead.utmSource?.toLowerCase().includes('meta')) {
+    return { name: 'Meta Ads', icon: '📘', color: 'bg-purple-500' };
+  }
+  if (lead.msclkid || lead.utmSource?.toLowerCase().includes('microsoft') || lead.utmSource?.toLowerCase().includes('bing')) {
+    return { name: 'Microsoft Ads', icon: '📊', color: 'bg-green-500' };
+  }
+  if (lead.utmSource?.toLowerCase().includes('linkedin')) {
+    return { name: 'LinkedIn Ads', icon: '💼', color: 'bg-blue-600' };
+  }
+  return { name: 'Direct Traffic', icon: '🌍', color: 'bg-orange-500' };
+};
+
+// Helper function to check if lead is won
+const isWonLead = (lead: Lead) => {
+  return lead.stage?.name.toLowerCase().includes('won') ||
+         lead.stage?.name.toLowerCase().includes('closed') ||
+         lead.stage?.name.toLowerCase().includes('success');
+};
+
+// Helper function to check if lead is lost
+const isLostLead = (lead: Lead) => {
+  return lead.stage?.name.toLowerCase().includes('lost') ||
+         lead.stage?.name.toLowerCase().includes('rejected') ||
+         lead.stage?.name.toLowerCase().includes('failed');
+};
+
 // Fetch leads from API
 const fetchLeads = async (): Promise<LeadsResponse> => {
   const response = await fetch('/api/leads');
@@ -56,87 +88,98 @@ export const useLeadsData = () => {
   });
 };
 
-// Derived data hooks
+// Hook for filtered leads based on time
+export const useFilteredLeads = () => {
+  const { data: leadsData, ...rest } = useLeadsData();
+  const { getDateRange, timeframe } = useTimeFilter();
+
+  const filteredData = React.useMemo(() => {
+    if (!leadsData?.leads) return null;
+
+    const { startDate, endDate } = getDateRange();
+    
+    const filteredLeads = leadsData.leads.filter(lead => {
+      const createdAt = new Date(lead.createdAt);
+      return createdAt >= startDate && createdAt <= endDate;
+    });
+
+    return {
+      ...leadsData,
+      leads: filteredLeads
+    };
+  }, [leadsData, getDateRange, timeframe]);
+
+  return { data: filteredData, ...rest };
+};
+
+// Updated dashboard metrics with time filtering
 export const useDashboardMetrics = () => {
   const { data: leadsData, ...rest } = useLeadsData();
+  const { getDateRange, getComparisonDateRange, timeframe } = useTimeFilter();
   
   const metrics = React.useMemo(() => {
     if (!leadsData?.leads) return null;
     
-    const leads = leadsData.leads;
-    const now = new Date();
-    const oneWeekAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const twoWeeksAgo = new Date(now.getTime() - 14 * 24 * 60 * 60 * 1000);
+    const allLeads = leadsData.leads;
+    const { startDate, endDate } = getDateRange();
+    const { startDate: compStartDate, endDate: compEndDate } = getComparisonDateRange();
     
-    // This week's leads
-    const thisWeekLeads = leads.filter(lead => 
-      new Date(lead.createdAt) >= oneWeekAgo
-    );
-    
-    // Last week's leads for comparison
-    const lastWeekLeads = leads.filter(lead => {
+    // Current period leads
+    const currentPeriodLeads = allLeads.filter(lead => {
       const createdAt = new Date(lead.createdAt);
-      return createdAt >= twoWeeksAgo && createdAt < oneWeekAgo;
+      return createdAt >= startDate && createdAt <= endDate;
+    });
+    
+    // Comparison period leads
+    const comparisonPeriodLeads = allLeads.filter(lead => {
+      const createdAt = new Date(lead.createdAt);
+      return createdAt >= compStartDate && createdAt <= compEndDate;
     });
     
     // Qualified leads
-    const qualifiedLeads = leads.filter(lead => lead.qualification === 'QUALIFIED');
-    const thisWeekQualified = thisWeekLeads.filter(lead => lead.qualification === 'QUALIFIED');
-    const lastWeekQualified = lastWeekLeads.filter(lead => lead.qualification === 'QUALIFIED');
+    const currentQualified = currentPeriodLeads.filter(lead => lead.qualification === 'QUALIFIED');
+    const comparisonQualified = comparisonPeriodLeads.filter(lead => lead.qualification === 'QUALIFIED');
     
-    // Won deals (assuming stages with names containing 'won', 'closed', 'success')
-    const wonDeals = leads.filter(lead => 
-      lead.stage?.name.toLowerCase().includes('won') ||
-      lead.stage?.name.toLowerCase().includes('closed') ||
-      lead.stage?.name.toLowerCase().includes('success')
-    );
+    // Won deals
+    const currentWon = currentPeriodLeads.filter(isWonLead);
+    const comparisonWon = comparisonPeriodLeads.filter(isWonLead);
     
-    const thisWeekWon = wonDeals.filter(lead => 
-      new Date(lead.createdAt) >= oneWeekAgo
-    );
-    const lastWeekWon = wonDeals.filter(lead => {
-      const createdAt = new Date(lead.createdAt);
-      return createdAt >= twoWeeksAgo && createdAt < oneWeekAgo;
-    });
-    
-    // Lost deals (assuming stages with names containing 'lost', 'rejected')
-    const lostDeals = leads.filter(lead => 
-      lead.stage?.name.toLowerCase().includes('lost') ||
-      lead.stage?.name.toLowerCase().includes('rejected') ||
-      lead.stage?.name.toLowerCase().includes('failed')
-    );
-    
-    const thisWeekLost = lostDeals.filter(lead => 
-      new Date(lead.createdAt) >= oneWeekAgo
-    );
-    const lastWeekLost = lostDeals.filter(lead => {
-      const createdAt = new Date(lead.createdAt);
-      return createdAt >= twoWeeksAgo && createdAt < oneWeekAgo;
-    });
+    // Lost deals
+    const currentLost = currentPeriodLeads.filter(isLostLead);
+    const comparisonLost = comparisonPeriodLeads.filter(isLostLead);
     
     // Calculate changes
-    const newLeadsChange = lastWeekLeads.length > 0 
-      ? ((thisWeekLeads.length - lastWeekLeads.length) / lastWeekLeads.length * 100)
-      : (thisWeekLeads.length > 0 ? 100 : 0);
+    const newLeadsChange = comparisonPeriodLeads.length > 0 
+      ? ((currentPeriodLeads.length - comparisonPeriodLeads.length) / comparisonPeriodLeads.length * 100)
+      : (currentPeriodLeads.length > 0 ? 100 : 0);
     
-    const qualificationRate = leads.length > 0 ? (qualifiedLeads.length / leads.length * 100) : 0;
-    const lastWeekQualificationRate = lastWeekLeads.length > 0 ? (lastWeekQualified.length / lastWeekLeads.length * 100) : 0;
-    const qualificationChange = lastWeekQualificationRate > 0 
-      ? qualificationRate - lastWeekQualificationRate 
+    const qualificationRate = currentPeriodLeads.length > 0 ? (currentQualified.length / currentPeriodLeads.length * 100) : 0;
+    const compQualificationRate = comparisonPeriodLeads.length > 0 ? (comparisonQualified.length / comparisonPeriodLeads.length * 100) : 0;
+    const qualificationChange = qualificationRate - compQualificationRate;
+    
+    const currentRevenue = currentWon.reduce((sum, lead) => sum + (lead.value || 0), 0);
+    const comparisonRevenue = comparisonWon.reduce((sum, lead) => sum + (lead.value || 0), 0);
+    const revenueChange = comparisonRevenue > 0 
+      ? ((currentRevenue - comparisonRevenue) / comparisonRevenue * 100)
+      : (currentRevenue > 0 ? 100 : 0);
+    
+    const lostDealsChange = comparisonLost.length > 0 
+      ? ((currentLost.length - comparisonLost.length) / comparisonLost.length * 100)
       : 0;
-    
-    const thisWeekRevenue = thisWeekWon.reduce((sum, lead) => sum + (lead.value || 0), 0);
-    const lastWeekRevenue = lastWeekWon.reduce((sum, lead) => sum + (lead.value || 0), 0);
-    const revenueChange = lastWeekRevenue > 0 
-      ? ((thisWeekRevenue - lastWeekRevenue) / lastWeekRevenue * 100)
-      : (thisWeekRevenue > 0 ? 100 : 0);
-    
-    const lostDealsChange = lastWeekLost.length > 0 
-      ? ((thisWeekLost.length - lastWeekLost.length) / lastWeekLost.length * 100)
-      : 0;
+
+    // Get period label
+    const getPeriodLabel = () => {
+      switch (timeframe) {
+        case 'week': return 'This Week';
+        case 'month': return 'This Month';
+        case 'quarter': return 'Last 90 Days';
+        default: return 'Current Period';
+      }
+    };
     
     return {
-      newLeadsThisWeek: thisWeekLeads.length,
+      periodLabel: getPeriodLabel(),
+      newLeadsCount: currentPeriodLeads.length,
       newLeadsChange: `${newLeadsChange >= 0 ? '+' : ''}${newLeadsChange.toFixed(1)}%`,
       newLeadsChangePositive: newLeadsChange >= 0,
       
@@ -144,77 +187,48 @@ export const useDashboardMetrics = () => {
       qualificationChange: `${qualificationChange >= 0 ? '+' : ''}${qualificationChange.toFixed(1)}%`,
       qualificationChangePositive: qualificationChange >= 0,
       
-      thisWeekRevenue,
+      currentRevenue,
       revenueChange: `${revenueChange >= 0 ? '+' : ''}${revenueChange.toFixed(0)}%`,
       revenueChangePositive: revenueChange >= 0,
-      wonDealsCount: thisWeekWon.length,
+      wonDealsCount: currentWon.length,
       
-      lostDealsThisWeek: thisWeekLost.length,
+      lostDealsCount: currentLost.length,
       lostDealsChange: `${lostDealsChange >= 0 ? '+' : ''}${lostDealsChange.toFixed(0)}%`,
       lostDealsChangePositive: lostDealsChange < 0, // negative change is positive for lost deals
     };
-  }, [leadsData]);
+  }, [leadsData, getDateRange, getComparisonDateRange, timeframe]);
   
   return { metrics, ...rest };
 };
 
+// Updated lead source metrics with time filtering
 export const useLeadSourceMetrics = () => {
-  const { data: leadsData, ...rest } = useLeadsData();
+  const { data: filteredData, ...rest } = useFilteredLeads();
   
   const sourceMetrics = React.useMemo(() => {
-    if (!leadsData?.leads) return [];
+    if (!filteredData?.leads) return [];
     
-    const leads = leadsData.leads;
+    const leads = filteredData.leads;
     
     // Group leads by source
     const sourceGroups = leads.reduce((acc, lead) => {
-      let source = 'Direct Traffic';
-      let icon = '🌐';
+      const source = getLeadSource(lead);
       
-      // Determine source based on UTM or tracking parameters
-      if (lead.gclid || lead.utmSource?.toLowerCase().includes('google')) {
-        source = 'Google Ads';
-        icon = '🎯';
-      } else if (lead.fbclid || lead.utmSource?.toLowerCase().includes('facebook') || lead.utmSource?.toLowerCase().includes('meta')) {
-        source = 'Meta Ads';
-        icon = '📘';
-      } else if (lead.msclkid || lead.utmSource?.toLowerCase().includes('microsoft') || lead.utmSource?.toLowerCase().includes('bing')) {
-        source = 'Microsoft Ads';
-        icon = '📊';
-      } else if (lead.utmSource?.toLowerCase().includes('linkedin')) {
-        source = 'LinkedIn Ads';
-        icon = '💼';
-      }
-      
-      if (!acc[source]) {
-        acc[source] = {
-          name: source,
-          icon,
+      if (!acc[source.name]) {
+        acc[source.name] = {
+          ...source,
           leads: [],
-          color: source === 'Google Ads' ? 'bg-blue-500' :
-                 source === 'Meta Ads' ? 'bg-purple-500' :
-                 source === 'Microsoft Ads' ? 'bg-green-500' :
-                 source === 'LinkedIn Ads' ? 'bg-blue-600' : 'bg-orange-500'
         };
       }
       
-      acc[source].leads.push(lead);
+      acc[source.name].leads.push(lead);
       return acc;
     }, {} as Record<string, any>);
     
     // Calculate metrics for each source
     return Object.values(sourceGroups).map((group: any) => {
-      const wonLeads = group.leads.filter((lead: Lead) => 
-        lead.stage?.name.toLowerCase().includes('won') ||
-        lead.stage?.name.toLowerCase().includes('closed') ||
-        lead.stage?.name.toLowerCase().includes('success')
-      );
-      
-      const lostLeads = group.leads.filter((lead: Lead) => 
-        lead.stage?.name.toLowerCase().includes('lost') ||
-        lead.stage?.name.toLowerCase().includes('rejected') ||
-        lead.stage?.name.toLowerCase().includes('failed')
-      );
+      const wonLeads = group.leads.filter(isWonLead);
+      const lostLeads = group.leads.filter(isLostLead);
       
       const winRate = (wonLeads.length + lostLeads.length) > 0 
         ? Math.round((wonLeads.length / (wonLeads.length + lostLeads.length)) * 100)
@@ -236,18 +250,19 @@ export const useLeadSourceMetrics = () => {
         icon: group.icon,
       };
     }).sort((a, b) => b.leads - a.leads);
-  }, [leadsData]);
+  }, [filteredData]);
   
   return { sourceMetrics, ...rest };
 };
 
+// Updated funnel metrics with time filtering
 export const useFunnelMetrics = () => {
-  const { data: leadsData, ...rest } = useLeadsData();
+  const { data: filteredData, ...rest } = useFilteredLeads();
   
   const funnelData = React.useMemo(() => {
-    if (!leadsData?.leads) return [];
+    if (!filteredData?.leads) return [];
     
-    const leads = leadsData.leads;
+    const leads = filteredData.leads;
     const totalLeads = leads.length;
     
     if (totalLeads === 0) return [];
@@ -293,7 +308,7 @@ export const useFunnelMetrics = () => {
     ];
     
     // Add custom stages from database
-    stages.forEach((stage: any, index) => {
+    stages.forEach((stage: any) => {
       const percentage = Math.round((stage.count / totalLeads) * 100);
       
       // Determine color based on stage name
@@ -326,18 +341,19 @@ export const useFunnelMetrics = () => {
     });
     
     return funnelStages;
-  }, [leadsData]);
+  }, [filteredData]);
   
   return { funnelData, ...rest };
 };
 
+// Updated activity stream with time filtering
 export const useActivityStream = () => {
-  const { data: leadsData, ...rest } = useLeadsData();
+  const { data: filteredData, ...rest } = useFilteredLeads();
   
   const activities = React.useMemo(() => {
-    if (!leadsData?.leads) return [];
+    if (!filteredData?.leads) return [];
     
-    const leads = leadsData.leads;
+    const leads = filteredData.leads;
     const activities: any[] = [];
     
     // Convert recent leads to activity items
@@ -346,19 +362,11 @@ export const useActivityStream = () => {
       .slice(0, 10);
     
     recentLeads.forEach((lead, index) => {
-      const createdAt = new Date(lead.createdAt);
       const updatedAt = new Date(lead.updatedAt);
       const now = new Date();
       
       // Determine source
-      let source = 'Direct Traffic';
-      if (lead.gclid || lead.utmSource?.toLowerCase().includes('google')) {
-        source = 'Google Ads';
-      } else if (lead.fbclid || lead.utmSource?.toLowerCase().includes('facebook')) {
-        source = 'Meta Ads';
-      } else if (lead.msclkid || lead.utmSource?.toLowerCase().includes('microsoft')) {
-        source = 'Microsoft Ads';
-      }
+      const source = getLeadSource(lead);
       
       // Calculate time ago
       const diffMs = now.getTime() - updatedAt.getTime();
@@ -378,7 +386,7 @@ export const useActivityStream = () => {
       // Determine activity type based on stage and timing
       let type = 'lead_received';
       let title = 'New lead received';
-      let description = `Lead #${lead.id.slice(-4)} from ${source}`;
+      let description = `Lead #${lead.id.slice(-4)} from ${source.name}`;
       let status = 'info';
       
       if (lead.qualification === 'QUALIFIED') {
@@ -386,12 +394,12 @@ export const useActivityStream = () => {
         title = 'Lead qualified';
         description = `Lead #${lead.id.slice(-4)} marked as qualified`;
         status = 'success';
-      } else if (lead.stage?.name.toLowerCase().includes('won')) {
+      } else if (isWonLead(lead)) {
         type = 'deal_won';
         title = 'Deal closed';
         description = `Lead #${lead.id.slice(-4)} converted to ${lead.value ? `$${lead.value.toLocaleString()}` : ''} deal`;
         status = 'success';
-      } else if (lead.stage?.name.toLowerCase().includes('lost')) {
+      } else if (isLostLead(lead)) {
         type = 'deal_lost';
         title = 'Deal marked as lost';
         description = `Lead #${lead.id.slice(-4)} lost to competitor`;
@@ -404,14 +412,14 @@ export const useActivityStream = () => {
         title,
         description,
         timestamp: timeAgo,
-        source,
+        source: source.name,
         value: lead.value ? `$${lead.value.toLocaleString()}` : undefined,
         status
       });
     });
     
     return activities;
-  }, [leadsData]);
+  }, [filteredData]);
   
   return { activities, ...rest };
 };

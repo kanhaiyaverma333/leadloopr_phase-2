@@ -4,10 +4,12 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { TimeFilterProvider, useTimeFilter } from '@/components/dashboard/contexts/TimeFilterContext';
 import DashboardKPIs from '@/components/dashboard/DashboardKPIs';
 import FunnelChart from '@/components/dashboard/FunnelChart';
 import LeadSourceChart from '@/components/dashboard/LeadSourceChart';
 import ActivityStream from '@/components/dashboard/ActivityStream';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 
 // Create a client
 const queryClient = new QueryClient({
@@ -20,24 +22,52 @@ const queryClient = new QueryClient({
   },
 });
 
+const TimeFilterSelector = () => {
+  const { timeframe, setTimeframe } = useTimeFilter();
+
+  return (
+    <Tabs value={timeframe} onValueChange={(value) => setTimeframe(value as any)}>
+      <TabsList className="glass-card border border-white/10">
+        <TabsTrigger value="week" className="text-sm">This Week</TabsTrigger>
+        <TabsTrigger value="month" className="text-sm">This Month</TabsTrigger>
+        <TabsTrigger value="quarter" className="text-sm">Last 90 Days</TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+};
+
 const DashboardContent = () => {
+  const { timeframe } = useTimeFilter();
+
+  const getTitle = () => {
+    switch (timeframe) {
+      case 'week': return 'This Week\'s Performance';
+      case 'month': return 'Monthly Performance';
+      case 'quarter': return '90-Day Performance';
+      default: return 'Performance Overview';
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-background/50">
-      {/* Main Content */}
-      <main className="container py-8 space-y-8">
+      {/* Header with Time Filter */}
+      <div className="flex items-center justify-between mb-8">
+        <h2 className="text-2xl font-bold">{getTitle()}</h2>
+        <TimeFilterSelector />
+      </div>
+
+      <main className="container py-0 space-y-8">
         {/* KPI Section */}
         <DashboardKPIs />
 
         {/* Analytics Section - Two Column Layout */}
         <div className="grid gap-6 lg:grid-cols-1">
           <FunnelChart />
-          
-        </div>
-        <div className="grid gap-6 lg:grid-cols-1">
-          <ActivityStream />
-          
         </div>
         
+        <div className="grid gap-6 lg:grid-cols-1">
+          <ActivityStream />
+        </div>
 
         {/* Bottom Section */}
         <div className="grid gap-6 lg:grid-cols-1">
@@ -80,7 +110,9 @@ const DashboardContent = () => {
 const Dashboard = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <DashboardContent />
+      <TimeFilterProvider>
+        <DashboardContent />
+      </TimeFilterProvider>
       <ReactQueryDevtools initialIsOpen={false} />
     </QueryClientProvider>
   );

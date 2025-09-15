@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import { ClerkProvider } from "@clerk/nextjs";
 import Providers from "./providers";
 
+
 const inter = Inter({ subsets: ["latin"], display: "swap" });
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -9,7 +9,7 @@ import { Elements } from "@stripe/react-stripe-js";
 import { loadStripe } from "@stripe/stripe-js";
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
-import { DurationFilterProvider } from "@/components/dashboard/contexts/DurationFilterContext";
+
 
 // Load Stripe using your publishable key
 const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
@@ -30,9 +30,9 @@ export default function Providers({ children }: { children: ReactNode }) {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
       <QueryClientProvider client={queryClient}>
         <Elements stripe={stripePromise}>
-          <DurationFilterProvider>
+          
             {children}
-          </DurationFilterProvider>
+        
         </Elements>
         <ReactQueryDevtools initialIsOpen={false} />
       </QueryClientProvider>
