@@ -1,3 +1,4 @@
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,113 +9,15 @@ import {
   X,
   CheckCircle,
   AlertTriangle,
-  RefreshCw
+  RefreshCw,
+  Loader2
 } from 'lucide-react';
-
-interface ActivityItem {
-  id: string;
-  type: 'lead_received' | 'lead_qualified' | 'deal_won' | 'deal_lost' | 'sync_success' | 'sync_failed';
-  title: string;
-  description: string;
-  timestamp: string;
-  source?: string;
-  value?: string;
-  status: 'success' | 'warning' | 'error' | 'info';
-}
+import { useActivityStream } from '@/lib/hooks/useLeadsData';
 
 const ActivityStream = () => {
-  const activities: ActivityItem[] = [
-    {
-      id: '1',
-      type: 'lead_received',
-      title: 'New lead received',
-      description: 'Lead #1048 from Google Ads campaign "SaaS Keywords"',
-      timestamp: '2 minutes ago',
-      source: 'Google Ads',
-      status: 'info'
-    },
-    {
-      id: '2',
-      type: 'sync_success',
-      title: 'Deal won synced',
-      description: 'Lead #1045 marked as won → synced to Google/Meta/Microsoft ✅',
-      timestamp: '8 minutes ago',
-      value: '$2,400',
-      status: 'success'
-    },
-    {
-      id: '3',
-      type: 'lead_qualified',
-      title: 'Lead qualified',
-      description: 'Lead #1047 marked as qualified after discovery call',
-      timestamp: '15 minutes ago',
-      source: 'Meta Ads',
-      status: 'success'
-    },
-    {
-      id: '4',
-      type: 'deal_lost',
-      title: 'Deal marked as lost',
-      description: 'Lead #1043 lost to competitor → synced to platforms ❌',
-      timestamp: '32 minutes ago',
-      status: 'warning'
-    },
-    {
-      id: '5',
-      type: 'sync_failed',
-      title: 'Sync failed',
-      description: 'Failed to sync lead #1042 to Meta - retrying in 5 minutes',
-      timestamp: '45 minutes ago',
-      status: 'error'
-    },
-    {
-      id: '6',
-      type: 'deal_won',
-      title: 'Deal closed',
-      description: 'Lead #1041 from Microsoft Ads converted to $3,200 deal',
-      timestamp: '1 hour ago',
-      value: '$3,200',
-      source: 'Microsoft Ads',
-      status: 'success'
-    },
-    {
-      id: '7',
-      type: 'lead_received',
-      title: 'New lead received',
-      description: 'Lead #1040 from organic search "CRM software comparison"',
-      timestamp: '1 hour ago',
-      source: 'Direct Traffic',
-      status: 'info'
-    },
-    {
-      id: '8',
-      type: 'lead_qualified',
-      title: 'Lead qualified',
-      description: 'Lead #1039 qualified after demo presentation',
-      timestamp: '2 hours ago',
-      source: 'Google Ads',
-      status: 'success'
-    },
-    {
-      id: '9',
-      type: 'sync_success',
-      title: 'Campaign sync completed',
-      description: 'All active campaigns synced to advertising platforms',
-      timestamp: '3 hours ago',
-      status: 'success'
-    },
-    {
-      id: '10',
-      type: 'lead_received',
-      title: 'New lead received',
-      description: 'Lead #1038 from LinkedIn campaign "B2B Solutions"',
-      timestamp: '4 hours ago',
-      source: 'LinkedIn Ads',
-      status: 'info'
-    }
-  ];
+  const { activities, isLoading, error } = useActivityStream();
 
-  const getIcon = (type: ActivityItem['type']) => {
+  const getIcon = (type: string) => {
     switch (type) {
       case 'lead_received':
         return UserPlus;
@@ -133,7 +36,7 @@ const ActivityStream = () => {
     }
   };
 
-  const getStatusColor = (status: ActivityItem['status']) => {
+  const getStatusColor = (status: string) => {
     switch (status) {
       case 'success':
         return 'text-green-400 bg-green-400/10';
@@ -152,8 +55,8 @@ const ActivityStream = () => {
     const sourceConfig = {
       'Google Ads': { color: 'bg-blue-500/10 text-blue-400', icon: '🎯' },
       'Meta Ads': { color: 'bg-purple-500/10 text-purple-400', icon: '📘' },
-      'Microsoft Ads': { color: 'bg-green-500/10 text-green-400', icon: '🔍' },
-      'LinkedIn Ads': { color: 'bg-blue-600/10 text-blue-400', icon: '👔' },
+      'Microsoft Ads': { color: 'bg-green-500/10 text-green-400', icon: '📊' },
+      'LinkedIn Ads': { color: 'bg-blue-600/10 text-blue-400', icon: '💼' },
     };
 
     const config = sourceConfig[source as keyof typeof sourceConfig] || {
@@ -167,6 +70,95 @@ const ActivityStream = () => {
       </Badge>
     );
   };
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+      >
+        <Card className="glass-card border-white/10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-primary" />
+              Live Activity Stream
+            </CardTitle>
+            <CardDescription>
+              Real-time updates on leads and sync status
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Loading activity stream...
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+      >
+        <Card className="glass-card border-white/10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-primary" />
+              Live Activity Stream
+            </CardTitle>
+            <CardDescription>
+              Real-time updates on leads and sync status
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center text-red-500 py-12">
+              <p>Unable to load activity stream.</p>
+              <p className="text-sm text-muted-foreground mt-1">Please check your connection and try again.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // Show empty state
+  if (!activities || activities.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.4 }}
+      >
+        <Card className="glass-card border-white/10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <RefreshCw className="h-5 w-5 text-primary" />
+              Live Activity Stream
+            </CardTitle>
+            <CardDescription>
+              Real-time updates on leads and sync status
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center text-muted-foreground py-12">
+              <p>No activity yet.</p>
+              <p className="text-sm mt-1">Lead activities will appear here as they happen.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -257,11 +249,14 @@ const ActivityStream = () => {
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/50 backdrop-blur-[1px] z-10 flex items-center justify-center">
                   <div className="text-xs text-primary/70 font-medium">AI analysis coming soon...</div>
                 </div>
-                <ul className="text-xs text-muted-foreground/60 space-y-1">
-                  <li>• Peak activity time: 2-4 PM - consider scheduling follow-ups</li>
-                  <li>• Google Ads generates 45% of qualified leads</li>
-                  <li>• Average response time: 15 minutes (industry leading)</li>
-                </ul>
+                {/* Show sample insights based on actual data when available */}
+                {activities.length > 0 && (
+                  <ul className="text-xs text-muted-foreground/60 space-y-1">
+                    <li>• Peak activity detected in recent hours</li>
+                    <li>• {activities.filter(a => a.type === 'lead_received').length} new leads in current session</li>
+                    <li>• Average response time analysis will appear here</li>
+                  </ul>
+                )}
               </div>
             </div>
           </div>

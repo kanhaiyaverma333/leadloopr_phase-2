@@ -1,69 +1,94 @@
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { TrendingUp, TrendingDown } from 'lucide-react';
-
-interface SourceData {
-  name: string;
-  leads: number;
-  won: number;
-  lost: number;
-  winRate: number;
-  trend: 'up' | 'down';
-  trendValue: string;
-  color: string;
-  icon: string;
-}
+import { TrendingUp, TrendingDown, Loader2 } from 'lucide-react';
+import { useLeadSourceMetrics } from '@/lib/hooks/useLeadsData';
 
 const LeadSourceChart = () => {
-  const sourceData: SourceData[] = [
-    {
-      name: "Google Ads",
-      leads: 89,
-      won: 18,
-      lost: 12,
-      winRate: 60,
-      trend: 'up',
-      trendValue: '+12%',
-      color: 'bg-blue-500',
-      icon: '🎯'
-    },
-    {
-      name: "Meta Ads",
-      leads: 34,
-      won: 6,
-      lost: 8,
-      winRate: 43,
-      trend: 'down',
-      trendValue: '-8%',
-      color: 'bg-purple-500',
-      icon: '📘'
-    },
-    {
-      name: "Microsoft Ads",
-      leads: 18,
-      won: 3,
-      lost: 2,
-      winRate: 60,
-      trend: 'up',
-      trendValue: '+5%',
-      color: 'bg-green-500',
-      icon: '🔍'
-    },
-    {
-      name: "Direct Traffic",
-      leads: 6,
-      won: 1,
-      lost: 1,
-      winRate: 50,
-      trend: 'up',
-      trendValue: '+2%',
-      color: 'bg-orange-500',
-      icon: '🌐'
-    }
-  ];
+  const { sourceMetrics, isLoading, error } = useLeadSourceMetrics();
 
-  const totalLeads = sourceData.reduce((sum, source) => sum + source.leads, 0);
+  // Show loading state
+  if (isLoading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <Card className="glass-card border-white/10">
+          <CardHeader>
+            <CardTitle>Lead Sources Performance</CardTitle>
+            <CardDescription>
+              ROI and conversion rates by traffic source
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Loading lead source data...
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <Card className="glass-card border-white/10">
+          <CardHeader>
+            <CardTitle>Lead Sources Performance</CardTitle>
+            <CardDescription>
+              ROI and conversion rates by traffic source
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center text-red-500 py-12">
+              <p>Unable to load lead source data.</p>
+              <p className="text-sm text-muted-foreground mt-1">Please check your connection and try again.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // Show empty state
+  if (!sourceMetrics || sourceMetrics.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.3 }}
+      >
+        <Card className="glass-card border-white/10">
+          <CardHeader>
+            <CardTitle>Lead Sources Performance</CardTitle>
+            <CardDescription>
+              ROI and conversion rates by traffic source
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center text-muted-foreground py-12">
+              <p>No lead sources data available yet.</p>
+              <p className="text-sm mt-1">Start receiving leads to see source performance analytics.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  const totalLeads = sourceMetrics.reduce((sum, source) => sum + source.leads, 0);
 
   return (
     <motion.div
@@ -80,8 +105,8 @@ const LeadSourceChart = () => {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {sourceData.map((source, index) => {
-              const percentage = ((source.leads / totalLeads) * 100).toFixed(1);
+            {sourceMetrics.map((source, index) => {
+              const percentage = totalLeads > 0 ? ((source.leads / totalLeads) * 100).toFixed(1) : '0';
               const isPositiveTrend = source.trend === 'up';
 
               return (
@@ -121,22 +146,24 @@ const LeadSourceChart = () => {
                   </div>
 
                   {/* Win/Loss Bar */}
-                  <div className="flex gap-1 mb-2">
-                    <div
-                      className="h-2 bg-green-500 rounded-l"
-                      style={{
-                        width: `${(source.won / (source.won + source.lost)) * 100}%`,
-                        minWidth: '4px'
-                      }}
-                    />
-                    <div
-                      className="h-2 bg-red-500 rounded-r"
-                      style={{
-                        width: `${(source.lost / (source.won + source.lost)) * 100}%`,
-                        minWidth: '4px'
-                      }}
-                    />
-                  </div>
+                  {(source.won + source.lost) > 0 && (
+                    <div className="flex gap-1 mb-2">
+                      <div
+                        className="h-2 bg-green-500 rounded-l"
+                        style={{
+                          width: `${(source.won / (source.won + source.lost)) * 100}%`,
+                          minWidth: source.won > 0 ? '4px' : '0px'
+                        }}
+                      />
+                      <div
+                        className="h-2 bg-red-500 rounded-r"
+                        style={{
+                          width: `${(source.lost / (source.won + source.lost)) * 100}%`,
+                          minWidth: source.lost > 0 ? '4px' : '0px'
+                        }}
+                      />
+                    </div>
+                  )}
 
                   <div className="flex items-center justify-between text-xs">
                     <div className="flex items-center gap-4">
@@ -199,7 +226,6 @@ const LeadSourceChart = () => {
                   <span>Predictive bid adjustments to maximize conversions</span>
                 </div>
               </div>
-
             </div>
           </div>
         </CardContent>

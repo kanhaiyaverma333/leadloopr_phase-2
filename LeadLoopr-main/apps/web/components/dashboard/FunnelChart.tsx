@@ -1,24 +1,86 @@
+import React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-
-interface FunnelStage {
-  name: string;
-  count: number;
-  percentage: number;
-  color: string; // tailwind bg color class for bar
-  light: string; // light tone (e.g., bg-blue-100) for track overlay accents
-  border: string; // border tone (e.g., border-blue-200)
-}
+import { Loader2 } from 'lucide-react';
+import { useFunnelMetrics } from '@/lib/hooks/useLeadsData';
 
 const FunnelChart = () => {
-  const funnelData: FunnelStage[] = [
-    { name: 'Leads Received', count: 147, percentage: 100, color: 'bg-blue-500', light: 'bg-blue-100', border: 'border-blue-200' },
-    { name: 'Qualified Leads', count: 94, percentage: 64, color: 'bg-green-500', light: 'bg-green-100', border: 'border-green-200' },
-    { name: 'Proposals Sent', count: 52, percentage: 35, color: 'bg-amber-500', light: 'bg-amber-100', border: 'border-amber-200' },
-    { name: 'Deals Won', count: 28, percentage: 19, color: 'bg-emerald-500', light: 'bg-emerald-100', border: 'border-emerald-200' },
-    { name: 'Deals Lost', count: 24, percentage: 16, color: 'bg-rose-500', light: 'bg-rose-100', border: 'border-rose-200' },
-  ];
+  const { funnelData, isLoading, error } = useFunnelMetrics();
+
+  // Show loading state
+  if (isLoading) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+      >
+        <Card className="glass-card border-white/10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">Conversion Funnel</CardTitle>
+            <CardDescription>Track where leads drop off in your sales process</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-center py-12">
+              <div className="flex items-center gap-3 text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" />
+                Loading funnel data...
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // Show error state
+  if (error) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+      >
+        <Card className="glass-card border-white/10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">Conversion Funnel</CardTitle>
+            <CardDescription>Track where leads drop off in your sales process</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center text-red-500 py-12">
+              <p>Unable to load funnel data.</p>
+              <p className="text-sm text-muted-foreground mt-1">Please check your connection and try again.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
+
+  // Show empty state
+  if (!funnelData || funnelData.length === 0) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.5, delay: 0.2 }}
+      >
+        <Card className="glass-card border-white/10">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">Conversion Funnel</CardTitle>
+            <CardDescription>Track where leads drop off in your sales process</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center text-muted-foreground py-12">
+              <p>No funnel data available yet.</p>
+              <p className="text-sm mt-1">Start receiving leads to see your conversion funnel.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div
@@ -64,16 +126,18 @@ const FunnelChart = () => {
                     {/* gradient sheen */}
                     <div className="absolute inset-0 bg-gradient-to-r from-white/20 via-white/0 to-white/0 mix-blend-overlay" />
                     {/* percentage label inside bar */}
-                    <div className="absolute inset-y-0 right-2 flex items-center">
-                      <span className="text-[10px] font-semibold text-white drop-shadow">{stage.percentage}%</span>
-                    </div>
+                    {stage.percentage > 10 && (
+                      <div className="absolute inset-y-0 right-2 flex items-center">
+                        <span className="text-[10px] font-semibold text-white drop-shadow">{stage.percentage}%</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 {/* Dropout indicator */}
-                {index < funnelData.length - 2 && index < 3 && (
+                {index < funnelData.length - 1 && funnelData[index + 1] && (
                   <div className="text-xs text-rose-500 mt-1">
-                    -{funnelData[index].count - funnelData[index + 1].count} dropped off
+                    -{stage.count - funnelData[index + 1].count} dropped off to next stage
                   </div>
                 )}
               </motion.div>
@@ -86,7 +150,7 @@ const FunnelChart = () => {
             <div className="relative">
               <div className="flex items-center gap-3 mb-3">
                 <div className="p-1.5 rounded-lg bg-gradient-to-r from-primary/15 to-purple-500/15">
-                  <span className="text-sm">🧠</span>
+                  <span className="text-sm">ðŸ§ </span>
                 </div>
                 <h4 className="font-semibold text-transparent bg-gradient-to-r from-primary to-purple-400 bg-clip-text">AI-Powered Insights</h4>
                 <Badge className="bg-gradient-to-r from-purple-500/15 to-primary/15 text-purple-300 border-purple-400/25 text-xs animate-pulse">Coming Soon</Badge>
@@ -98,11 +162,16 @@ const FunnelChart = () => {
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent to-background/50 backdrop-blur-[1px] z-10 flex items-center justify-center">
                   <div className="text-xs text-primary/70 font-medium">AI analysis coming soon...</div>
                 </div>
-                <ul className="text-xs text-muted-foreground/60 space-y-1">
-                  <li>• 36% drop from qualified to proposal - consider faster follow-up</li>
-                  <li>• Strong 54% proposal-to-close rate - pricing is competitive</li>
-                  <li>• Overall 19% lead-to-close conversion is above industry average</li>
-                </ul>
+                {/* Show sample insights based on actual data when available */}
+                {funnelData.length > 1 && (
+                  <ul className="text-xs text-muted-foreground/60 space-y-1">
+                    <li>â€¢ {Math.round(((funnelData[0].count - (funnelData[1]?.count || 0)) / funnelData[0].count) * 100)}% drop from leads to qualified - consider faster follow-up</li>
+                    {funnelData.length > 2 && (
+                      <li>â€¢ {Math.round((funnelData[funnelData.length-1].count / funnelData[0].count) * 100)}% overall conversion rate</li>
+                    )}
+                    <li>â€¢ Pipeline optimization recommendations will appear here</li>
+                  </ul>
+                )}
               </div>
             </div>
           </div>
