@@ -26,7 +26,7 @@ const TimeFilterSelector = () => {
   const { timeframe, setTimeframe } = useTimeFilter();
 
   return (
-    <Tabs value={timeframe} onValueChange={(value) => setTimeframe(value as any)}>
+    <Tabs  value={timeframe} onValueChange={(value) => setTimeframe(value as any)}>
       <TabsList className="glass-card border border-white/10">
         <TabsTrigger value="week" className="text-sm">This Week</TabsTrigger>
         <TabsTrigger value="month" className="text-sm">This Month</TabsTrigger>
@@ -51,12 +51,18 @@ const DashboardContent = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-background to-background/50">
       {/* Header with Time Filter */}
-      <div className="flex items-center justify-between mb-8">
-        <h2 className="text-2xl font-bold">{getTitle()}</h2>
-        <TimeFilterSelector />
-      </div>
+     
 
       <main className="container py-0 space-y-8">
+        <div className="flex items-center justify-between w-full  py-8">
+  <div className="">
+    <h2 className="text-2xl font-bold">{getTitle()}</h2>
+  </div>
+  <div>
+    <TimeFilterSelector />
+  </div>
+</div>
+
         {/* KPI Section */}
         <DashboardKPIs />
 

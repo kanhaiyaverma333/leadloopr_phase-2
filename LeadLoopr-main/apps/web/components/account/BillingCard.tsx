@@ -585,10 +585,10 @@ export function BillingCard() {
 
                   <div className="space-y-4">
                     <p className="text-sm text-muted-foreground">
-                      Are you sure you want to cancel your subscription? You have two options:
+                      Are you sure you want to cancel your subscription?
                     </p>
 
-                    <div className="space-y-3">
+                    {/* <div className="space-y-3">
                       <div className="p-3 border rounded-lg">
                         <h4 className="font-medium mb-1">Cancel at period end (Recommended)</h4>
                         <p className="text-sm text-muted-foreground mb-3">
@@ -618,7 +618,7 @@ export function BillingCard() {
                           {cancelLoading ? 'Cancelling...' : 'Cancel Immediately'}
                         </Button>
                       </div>
-                    </div>
+                    </div> */}
 
                     <div className="pt-3 border-t">
                       <Button

@@ -65,7 +65,8 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
     console.error('Error fetching subscription plans from Stripe:', error);
     
     // Fallback to hardcoded plans if Stripe fails
-    return getFallbackPlans();
+    // return getFallbackPlans();
+    return []
   }
 }
 

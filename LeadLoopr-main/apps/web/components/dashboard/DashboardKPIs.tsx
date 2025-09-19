@@ -176,7 +176,7 @@ const DashboardKPIs = () => {
               key={kpi.title}
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5, delay: index * 0.1 }}
+              transition={{ duration: 0.5, delay:  0.1 }}
             >
               <Card className={`glass-card border-white/20 hover:border-white/30 transition-all duration-300 bg-card/70 backdrop-saturate-[1.2] border-t-4 ${kpi.accent}`}>
                 <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">

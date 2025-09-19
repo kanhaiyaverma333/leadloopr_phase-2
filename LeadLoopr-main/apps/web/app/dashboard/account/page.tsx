@@ -7,8 +7,8 @@ import { TeamMembersCard } from '@/components/account/TeamMembersCard'
 
 
 export default async function AccountPage() {
-    const { userId } = await auth()
-
+    const { userId,orgRole } = await auth()
+     console.log("helloWord",orgRole)
     if (!userId) {
         redirect('/auth/sign-in')
     }
@@ -39,9 +39,11 @@ export default async function AccountPage() {
                     </div>
 
                     {/* Billing Section */}
-                    <div>
+                    {orgRole === "org:admin" &&
+                     <div>
                         <BillingCard />
-                    </div>
+                    </div>}
+                   
                 </div>
             </div>
         </div>
