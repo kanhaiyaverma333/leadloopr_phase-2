@@ -695,7 +695,7 @@ export const KanbanBoard: React.FC = () => {
                         ))}
 
                         {/* Add Stage Button */}
-                        <div className="flex-shrink-0 w-80">
+                        {/* <div className="flex-shrink-0 w-80">
                             <Button
                                 variant="outline"
                                 className="w-full h-8 rounded-full bg-card hover:bg-accent border-dotted border-border text-muted-foreground"
@@ -704,7 +704,7 @@ export const KanbanBoard: React.FC = () => {
                                 <Plus className="w-4 h-4 mr-2" />
                                 Add Stage
                             </Button>
-                        </div>
+                        </div> */}
                     </div>
                 </div>
 

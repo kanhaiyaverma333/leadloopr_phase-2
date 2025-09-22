@@ -155,13 +155,13 @@ export const KanbanColumn: React.FC<KanbanColumnProps> = ({
                                     <MoreHorizontal className="w-4 h-4" />
                                 </Button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                                <DropdownMenuItem onClick={handleRename}>Rename</DropdownMenuItem>
+                            <DropdownMenuContent align="end" >
+                                {/* <DropdownMenuItem onClick={handleRename}>Rename</DropdownMenuItem> */}
                                 <DropdownMenuItem onClick={handleChangeColor}>Change Color</DropdownMenuItem>
-                                <DropdownMenuSeparator />
+                                {/* <DropdownMenuSeparator />
                                 <AlertDialogTrigger asChild>
                                     <DropdownMenuItem className="text-red-600">Delete</DropdownMenuItem>
-                                </AlertDialogTrigger>
+                                </AlertDialogTrigger> */}
                             </DropdownMenuContent>
                         </DropdownMenu>
                         <AlertDialogContent>
