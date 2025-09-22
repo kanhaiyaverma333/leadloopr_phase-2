@@ -588,8 +588,8 @@ export function BillingCard() {
                       Are you sure you want to cancel your subscription?
                     </p>
 
-                    {/* <div className="space-y-3">
-                      <div className="p-3 border rounded-lg">
+                    <div className="space-y-3">
+                      {/* <div className="p-3 border rounded-lg">
                         <h4 className="font-medium mb-1">Cancel at period end (Recommended)</h4>
                         <p className="text-sm text-muted-foreground mb-3">
                           Keep access until your current billing period ends, then cancel automatically.
@@ -602,7 +602,7 @@ export function BillingCard() {
                         >
                           {cancelLoading ? 'Cancelling...' : 'Cancel at Period End'}
                         </Button>
-                      </div>
+                      </div> */}
 
                       <div className="p-3 border border-red-200 rounded-lg">
                         <h4 className="font-medium mb-1 text-red-600">Cancel immediately</h4>
@@ -618,7 +618,7 @@ export function BillingCard() {
                           {cancelLoading ? 'Cancelling...' : 'Cancel Immediately'}
                         </Button>
                       </div>
-                    </div> */}
+                    </div>
 
                     <div className="pt-3 border-t">
                       <Button
