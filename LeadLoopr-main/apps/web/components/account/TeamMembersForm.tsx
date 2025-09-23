@@ -1,89 +1,292 @@
 'use client'
 
-import { Button } from "@/components/ui/button";
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
-import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Users, Building2 } from "lucide-react";
+import { InviteMemberModal } from "./InviteMemberModal";
+import { CreateOrganization } from '@clerk/nextjs';
 import {
-    DropdownMenu,
-    DropdownMenuContent,
-    DropdownMenuItem,
-    DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+    Dialog,
+    DialogContent,
+} from '@/components/ui/dialog';
 
-const teamMembers = [
-    {
-        name: "Sofia Davis",
-        email: "sofia.davis@example.com",
-        role: "Owner",
-        initials: "SD",
-    },
-    {
-        name: "Jackson Lee",
-        email: "jackson.lee@example.com",
-        role: "Member",
-        initials: "JL",
-    },
-    {
-        name: "Ava Garcia",
-        email: "ava.garcia@example.com",
-        role: "Member",
-        initials: "AG",
+interface TeamMember {
+    id: string;
+    userId: string;
+    name: string;
+    email: string;
+    role: string;
+    initials: string;
+    imageUrl?: string | null;
+}
+
+export function TeamMembersCard() {
+    const [members, setMembers] = useState<TeamMember[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+    const [isCreateOrgModalOpen, setIsCreateOrgModalOpen] = useState(false);
+
+    const fetchMembers = async () => {
+        try {
+            setLoading(true);
+            const response = await fetch('/api/organization/members');
+            if (!response.ok) {
+                throw new Error('Failed to fetch members');
+            }
+            const data = await response.json();
+            if (data.success) {
+                setMembers(data.members);
+            } else {
+                throw new Error(data.error || 'Failed to fetch members');
+            }
+        } catch (err) {
+            setError(err instanceof Error ? err.message : 'Failed to fetch members');
+            console.error('Error fetching members:', err);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchMembers();
+    }, []);
+
+    if (loading) {
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+            >
+                <Card className="glass-card h-fit">
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Users className="h-5 w-5" />
+                                    Team Members
+                                </CardTitle>
+                                <CardDescription>
+                                    Manage your team and their permissions
+                                </CardDescription>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button className="bg-gradient-primary hover:opacity-90 glow" disabled>
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Member
+                                </Button>
+                                <Button variant="outline" disabled>
+                                    <Building2 className="h-4 w-4 mr-2" />
+                                    Create Org
+                                </Button>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            <div className="animate-pulse">
+                                <div className="h-4 bg-muted rounded w-24 mb-4"></div>
+                                {[1, 2, 3].map((i) => (
+                                    <div key={i} className="flex items-center justify-between p-4 border rounded-lg glass">
+                                        <div className="flex items-center gap-3">
+                                            <div className="h-8 w-8 bg-muted rounded-full"></div>
+                                            <div>
+                                                <div className="h-4 bg-muted rounded w-32 mb-1"></div>
+                                                <div className="h-3 bg-muted rounded w-40"></div>
+                                            </div>
+                                        </div>
+                                        <div className="h-6 bg-muted rounded w-16"></div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </CardContent>
+                </Card>
+            </motion.div>
+        );
     }
-];
 
-export function TeamMembersForm() {
+    if (error) {
+        return (
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+            >
+                <Card className="glass-card h-fit">
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Users className="h-5 w-5" />
+                                    Team Members
+                                </CardTitle>
+                                <CardDescription>
+                                    Manage your team and their permissions
+                                </CardDescription>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button className="bg-gradient-primary hover:opacity-90 glow">
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Member
+                                </Button>
+                                <Button 
+                                    variant="outline"
+                                    onClick={() => setIsCreateOrgModalOpen(true)}
+                                >
+                                    <Building2 className="h-4 w-4 mr-2" />
+                                    Create Org
+                                </Button>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-center py-8">
+                            <p className="text-destructive mb-4">Failed to load team members</p>
+                            <Button
+                                variant="outline"
+                                onClick={() => window.location.reload()}
+                            >
+                                Try Again
+                            </Button>
+                        </div>
+                    </CardContent>
+                </Card>
+            </motion.div>
+        );
+    }
+
     return (
-        <Card>
-            <CardHeader>
-                <CardTitle>Team Members</CardTitle>
-                <CardDescription>
-                    Manage who has access to this organization.
-                </CardDescription>
-            </CardHeader>
-            <CardContent>
-                <div className="space-y-6">
-                    <div className="flex items-center justify-between">
-                        <p className="text-sm text-muted-foreground">3 of 5 members</p>
-                        <Button>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Member
-                        </Button>
-                    </div>
-
-                    <div className="space-y-4">
-                        {teamMembers.map((member) => (
-                            <div key={member.email} className="flex items-center justify-between space-x-4">
-                                <div className="flex items-center space-x-4">
-                                    <Avatar>
-                                        <AvatarFallback>{member.initials}</AvatarFallback>
-                                    </Avatar>
-                                    <div>
-                                        <p className="text-sm font-medium leading-none">{member.name}</p>
-                                        <p className="text-sm text-muted-foreground">{member.email}</p>
+        <>
+            <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: 0.1 }}
+            >
+                <Card className="glass-card h-fit">
+                    <CardHeader>
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <CardTitle className="flex items-center gap-2">
+                                    <Users className="h-5 w-5" />
+                                    Team Members
+                                </CardTitle>
+                                <CardDescription>
+                                    Manage your team and their permissions
+                                </CardDescription>
+                            </div>
+                            <div className="flex gap-2">
+                                <Button
+                                    className="bg-gradient-primary hover:opacity-90 glow"
+                                    onClick={() => setIsInviteModalOpen(true)}
+                                >
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Add Member
+                                </Button>
+                                <Button 
+                                    variant="outline"
+                                    onClick={() => setIsCreateOrgModalOpen(true)}
+                                    className="glass"
+                                >
+                                    <Building2 className="h-4 w-4 mr-2" />
+                                    Create Org
+                                </Button>
+                            </div>
+                        </div>
+                    </CardHeader>
+                    <CardContent>
+                        <div className="space-y-4">
+                            {members.length === 0 ? (
+                                <div className="text-center py-8 text-muted-foreground">
+                                    <p>No team members found</p>
+                                    <div className="flex justify-center gap-2 mt-4">
+                                        <Button
+                                            variant="outline"
+                                            className="glass"
+                                            onClick={() => setIsInviteModalOpen(true)}
+                                        >
+                                            <Plus className="h-4 w-4 mr-2" />
+                                            Invite your first member
+                                        </Button>
+                                        <Button
+                                            variant="outline"
+                                            className="glass"
+                                            onClick={() => setIsCreateOrgModalOpen(true)}
+                                        >
+                                            <Building2 className="h-4 w-4 mr-2" />
+                                            Create new organization
+                                        </Button>
                                     </div>
                                 </div>
-                                <div>
-                                    {member.role === 'Owner' ? (
-                                        <span className="text-sm font-medium text-muted-foreground">{member.role}</span>
-                                    ) : (
-                                        <DropdownMenu>
-                                            <DropdownMenuTrigger asChild>
-                                                <Button variant="outline" className="text-sm font-medium">{member.role}</Button>
-                                            </DropdownMenuTrigger>
-                                            <DropdownMenuContent>
-                                                <DropdownMenuItem>Owner</DropdownMenuItem>
-                                                <DropdownMenuItem>Member</DropdownMenuItem>
-                                                <DropdownMenuItem className="text-red-600">Remove</DropdownMenuItem>
-                                            </DropdownMenuContent>
-                                        </DropdownMenu>
-                                    )}
-                                </div>
-                            </div>
-                        ))}
+                            ) : (
+                                members.map((member, index) => (
+                                    <motion.div
+                                        key={member.id}
+                                        initial={{ opacity: 0, x: -20 }}
+                                        animate={{ opacity: 1, x: 0 }}
+                                        transition={{ duration: 0.3, delay: index * 0.1 }}
+                                        className="flex items-center justify-between p-4 rounded-lg border border-border/50 glass"
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <Avatar>
+                                                <AvatarImage
+                                                    src={member.imageUrl || undefined}
+                                                    alt={member.name}
+                                                />
+                                                <AvatarFallback className="bg-gradient-primary text-primary-foreground">
+                                                    {member.initials}
+                                                </AvatarFallback>
+                                            </Avatar>
+                                            <div>
+                                                <p className="font-medium">{member.name}</p>
+                                                <p className="text-sm text-muted-foreground">{member.email}</p>
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                            <Badge
+                                                variant={member.role === 'Admin' ? 'default' : 'secondary'}
+                                                className="text-xs"
+                                            >
+                                                {member.role}
+                                            </Badge>
+                                            <Badge variant="outline" className="text-xs">
+                                                Active
+                                            </Badge>
+                                        </div>
+                                    </motion.div>
+                                ))
+                            )}
+                        </div>
+                    </CardContent>
+                </Card>
+            </motion.div>
+
+            <InviteMemberModal
+                open={isInviteModalOpen}
+                onOpenChange={setIsInviteModalOpen}
+            />
+
+            <Dialog open={isCreateOrgModalOpen} onOpenChange={setIsCreateOrgModalOpen}>
+                <DialogContent className="sm:max-w-md">
+                    <div className="py-4">
+                        <CreateOrganization
+                            afterCreateOrganizationUrl="/dashboard"
+                            skipInvitationScreen={true}
+                            appearance={{
+                                elements: {
+                                    rootBox: 'w-full',
+                                    card: 'shadow-none border-0',
+                                }
+                            }}
+                        />
                     </div>
-                </div>
-            </CardContent>
-        </Card>
+                </DialogContent>
+            </Dialog>
+        </>
     );
-} 
+}
