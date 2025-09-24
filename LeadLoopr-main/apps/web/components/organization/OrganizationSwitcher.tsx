@@ -132,6 +132,9 @@ export function OrganizationSwitcher() {
     }
   }
 
+
+  
+
   return (
     <>
       <DropdownMenu>
@@ -208,39 +211,28 @@ export function OrganizationSwitcher() {
       </DropdownMenu>
 
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="sm:max-w-md">
-          <div className="py-4">
-            <CreateOrganization
-              afterCreateOrganizationUrl="/dashboard"
-              skipInvitationScreen
-              appearance={{
-                elements: {
-                  rootBox: 'w-full',
-                  card: 'shadow-none border-0 bg-transparent',
-                  headerTitle: 'text-lg font-semibold text-foreground',
-                  headerSubtitle: 'text-sm text-muted-foreground',
-                  socialButtonsIconButton: 'border border-input bg-background hover:bg-accent hover:text-accent-foreground',
-                  formButtonPrimary: 'bg-primary text-primary-foreground hover:bg-primary/90',
-                  formFieldInput: 'flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50',
-                  formFieldLabel: 'text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70',
-                  dividerLine: 'bg-border',
-                  dividerText: 'text-muted-foreground',
-                  footer: 'hidden'
-                },
-                variables: {
-                  colorPrimary: 'hsl(var(--primary))',
-                  colorBackground: 'hsl(var(--background))',
-                  colorText: 'hsl(var(--foreground))',
-                  colorTextSecondary: 'hsl(var(--muted-foreground))',
-                  colorInputBackground: 'hsl(var(--background))',
-                  colorInputText: 'hsl(var(--foreground))',
-                  borderRadius: '0.5rem'
-                }
-              }}
-            />
+        <DialogContent className="sm:max-w-md lg:max-w-lg flex justify-center items-center">
+          <div className="py-4 w-full  flex items-center justify-center">
+            <div>
+                    <div className="text-center mb-6">
+                        <h1 className="text-2xl font-bold text-gray-900 mb-2">Welcome to LeadLoopr</h1>
+                        <p className="text-gray-600">Create your organization to get started</p>
+                    </div>
+             <CreateOrganization
+                        afterCreateOrganizationUrl="/dashboard"
+                        appearance={{
+                            elements: {
+                                rootBox: 'w-full',
+                                card: 'shadow-lg border border-gray-200 bg-white rounded-lg',
+                            }
+                        }}
+                    />
+            </div>
           </div>
         </DialogContent>
       </Dialog>
+
+      
     </>
   )
 }
