@@ -109,7 +109,7 @@ model OrganizationUser {
   id             String   @id @default(cuid())
   userId         String
   organizationId String
-  role           UserRole @default(MEMBER)
+  role           UserRole @default(ADMIN)
 
   user         User         @relation(fields: [userId], references: [id])
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)

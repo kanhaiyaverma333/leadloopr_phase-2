@@ -9,8 +9,8 @@ export interface SubscriptionPlan {
   name: string;
   price: number;
   currency: string;
-  interval: string; // Will be "Monthly", "Quartly", or "Yearly"
-  trialDays: number; // Make required, always have a value
+  interval: "monthly" | "quarterly" | "yearly"; // ✅ Normalized to lowercase
+  trialDays: number;
   features: string[];
   stripePriceId: string;
   leadLimit: number;
@@ -29,10 +29,13 @@ const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes
 export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
   // Return cached plans if still valid
   if (plansCache && Date.now() < cacheExpiry) {
+    console.log('Returning cached plans');
     return plansCache;
   }
 
   try {
+    console.log('Fetching fresh plans from Stripe...');
+    
     // Fetch all active products
     const products = await stripe.products.list({
       active: true,
@@ -45,16 +48,23 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
       type: 'recurring'
     });
 
+    console.log(`Found ${products.data.length} products and ${prices.data.length} prices`);
+
     // Map products to our plan structure
     const plans: SubscriptionPlan[] = products.data
       .map(product => {
         const productPrice = prices.data.find(price => price.product === product.id);
-        if (!productPrice) return null;
+        if (!productPrice) {
+          console.warn(`No price found for product: ${product.name} (${product.id})`);
+          return null;
+        }
 
         return mapStripeProductToPlan(product, productPrice);
       })
       .filter((plan): plan is SubscriptionPlan => plan !== null)
       .sort((a, b) => a.price - b.price); // Sort by price ascending
+
+    console.log(`Mapped ${plans.length} valid plans:`, plans.map(p => ({ name: p.name, interval: p.interval, price: p.price })));
 
     // Update cache
     plansCache = plans;
@@ -64,9 +74,15 @@ export async function getSubscriptionPlans(): Promise<SubscriptionPlan[]> {
   } catch (error) {
     console.error('Error fetching subscription plans from Stripe:', error);
     
-    // Fallback to hardcoded plans if Stripe fails
-    // return getFallbackPlans();
-    return []
+    // Return fallback plans if Stripe fails
+    console.log('Using fallback plans due to Stripe error');
+    const fallbackPlans = getFallbackPlans();
+    
+    // Cache fallback plans for a shorter duration
+    plansCache = fallbackPlans;
+    cacheExpiry = Date.now() + (1 * 60 * 1000); // 1 minute cache for fallbacks
+    
+    return fallbackPlans;
   }
 }
 
@@ -77,26 +93,84 @@ function mapStripeProductToPlan(
   product: Stripe.Product, 
   price: Stripe.Price
 ): SubscriptionPlan | null {
-  if (!price.unit_amount) return null;
+  if (!price.unit_amount) {
+    console.warn(`Price has no unit_amount for product: ${product.name}`);
+    return null;
+  }
 
   // Extract custom metadata for features and limits
   const metadata = product.metadata || {};
   const planId = getReadablePlanId(product.name);
   
-  return {
+  // Normalize interval from Stripe price or metadata
+  let interval: "monthly" | "quarterly" | "yearly" = "monthly";
+  
+  if (price.recurring?.interval) {
+    // Map Stripe intervals to our normalized format
+    switch (price.recurring.interval) {
+      case 'month':
+        interval = price.recurring.interval_count === 3 ? 'quarterly' : 'monthly';
+        break;
+      case 'year':
+        interval = 'yearly';
+        break;
+      default:
+        interval = 'monthly';
+    }
+  } else if (metadata.interval) {
+    // Fallback to metadata if recurring interval not available
+    interval = normalizeInterval(metadata.interval);
+  }
+
+  // Parse features - handle both arrays and strings
+  let features: string[] = [];
+  if (metadata.features) {
+    features = parseFeatures(metadata.features);
+  } else if (product.description) {
+    features = parseFeatures(product.description);
+  }
+
+  const plan: SubscriptionPlan = {
     id: planId,
     productId: product.id,
     name: product.name,
-    price: price.unit_amount / 100, // Convert cents to dollars
+    price: price.unit_amount / 100, // Convert cents to currency units
     currency: price.currency,
-    interval: metadata.interval || 'Monthly', // ✅ Use "Monthly", "Quartly", "Yearly" from metadata
+    interval,
     trialDays: getTrialDaysForPlan(planId),
     stripePriceId: price.id,
-    features: parseFeatures(metadata.features || product.description || ''),
+    features,
     leadLimit: parseInt(metadata.leadLimit || '0'),
     teamLimit: parseInt(metadata.teamLimit || '0'),
     popular: metadata.popular === 'true'
   };
+
+  console.log(`Mapped plan: ${plan.name} - ${plan.interval} - ${plan.price} ${plan.currency}`);
+  return plan;
+}
+
+/**
+ * Normalize interval strings to our standard format
+ */
+function normalizeInterval(interval: string): "monthly" | "quarterly" | "yearly" {
+  const normalized = interval.toLowerCase();
+  switch (normalized) {
+    case 'monthly':
+    case 'month':
+      return 'monthly';
+    case 'quarterly':
+    case 'quarter':
+    case 'quartly': // Handle typo from your data
+      return 'quarterly';
+    case 'yearly':
+    case 'year':
+    case 'annual':
+    case 'annually':
+      return 'yearly';
+    default:
+      console.warn(`Unknown interval: ${interval}, defaulting to monthly`);
+      return 'monthly';
+  }
 }
 
 /**
@@ -112,10 +186,26 @@ function getReadablePlanId(productName: string): string {
 function parseFeatures(featuresString: string): string[] {
   if (!featuresString) return [];
   
-  return featuresString
-    .split(/[\n,|]/)
+  // Handle very long feature strings by splitting them intelligently
+  const features = featuresString
+    .split(/[\n,|]/) // Split on newlines, commas, or pipes
     .map(feature => feature.trim())
-    .filter(feature => feature.length > 0);
+    .filter(feature => feature.length > 0)
+    .flatMap(feature => {
+      // If feature is too long, try to split it further
+      if (feature.length > 100) {
+        // Split on capital letters that start new sentences
+        return feature
+          .split(/(?=[A-Z][a-z])/)
+          .map(f => f.trim())
+          .filter(f => f.length > 5 && f.length < 80); // Reasonable length features
+      }
+      return [feature];
+    })
+    .slice(0, 8); // Limit to 8 features max
+
+  console.log(`Parsed ${features.length} features from: "${featuresString.substring(0, 100)}..."`);
+  return features;
 }
 
 /**
@@ -127,56 +217,59 @@ function getFallbackPlans(): SubscriptionPlan[] {
       id: 'starter',
       productId: 'prod_SzCaVwBgyWO83S',
       name: 'Starter',
-      price: 29,
-      currency: 'usd',
-      interval: 'Monthly', // ✅ fallback default
+      price: 50,
+      currency: 'inr',
+      interval: 'monthly',
       trialDays: getTrialDaysForPlan('starter'),
       features: [
-        '500 leads per month',
-        '5 team members',
-        'Basic integrations',
+        'Basic lead management',
+        'Up to 100 leads',
+        '1 team member',
         'Email support',
+        'Standard integrations'
       ],
-      stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PRICE_ID_STARTER!,
-      leadLimit: 500,
-      teamLimit: 5,
+      stripePriceId: 'price_1S3biVCyH2nEoMamXbDI6pi4',
+      leadLimit: 100,
+      teamLimit: 1,
     },
     {
       id: 'professional',
-      productId: 'prod_SzCbQy9cRmYeOa',
+      productId: 'prod_SzbFGAa8UvpLmr',
       name: 'Professional',
-      price: 79,
-      currency: 'usd',
-      interval: 'Monthly', // ✅ fallback default
+      price: 240,
+      currency: 'inr',
+      interval: 'quarterly',
       trialDays: getTrialDaysForPlan('professional'),
       features: [
-        '2,000 leads per month',
-        '15 team members',
-        'All integrations',
+        'Unlimited pipelines & leads',
+        'One-click ad platform syncing',
+        '35-day free trial',
         'Priority support',
-        'Advanced analytics',
+        'Team collaboration',
+        'Advanced analytics'
       ],
-      stripePriceId: process.env.NEXT_PUBLIC_STRIPE_PROFESSIONAL_PRICE_ID!,
-      leadLimit: 2000,
-      teamLimit: 15,
+      stripePriceId: 'price_1S3c3OCyH2nEoMamP470RYRs',
+      leadLimit: -1,
+      teamLimit: -1,
       popular: true,
     },
     {
       id: 'enterprise',
       productId: 'prod_SzCdwzV1WPShQg',
       name: 'Enterprise',
-      price: 199,
-      currency: 'usd',
-      interval: 'Monthly', // ✅ fallback default
+      price: 800,
+      currency: 'inr',
+      interval: 'yearly',
       trialDays: getTrialDaysForPlan('enterprise'),
       features: [
-        'Unlimited leads',
-        'Unlimited team members',
+        'Everything in Professional',
         'Custom integrations',
         'Dedicated support',
         'White-label options',
+        'Advanced security',
+        'Custom reporting'
       ],
-      stripePriceId: process.env.NEXT_PUBLIC_STRIPE_ENTERPRISE_PRICE_ID!,
+      stripePriceId: 'price_1S3blNCyH2nEoMam8qsx9k3w',
       leadLimit: -1,
       teamLimit: -1,
     },
@@ -192,37 +285,37 @@ export async function getSubscriptionPlan(planId: string): Promise<SubscriptionP
 }
 
 /**
+ * Get plans filtered by interval
+ */
+export async function getSubscriptionPlansByInterval(interval: "monthly" | "quarterly" | "yearly"): Promise<SubscriptionPlan[]> {
+  const plans = await getSubscriptionPlans();
+  return plans.filter(plan => plan.interval === interval);
+}
+
+/**
  * Clear the plans cache (useful for testing or manual refresh)
  */
 export function clearPlansCache(): void {
+  console.log('Clearing plans cache');
   plansCache = null;
   cacheExpiry = 0;
 }
 
 /**
- * API route to fetch plans (for frontend use)
+ * Check if cache is valid
  */
-export async function GET() {
-  try {
-    const plans = await getSubscriptionPlans();
-    
-    return Response.json({
-      success: true,
-      plans,
-      count: plans.length,
-      cached: plansCache !== null,
-      expires: new Date(cacheExpiry).toISOString(),
-      trialConfig: {
-        defaultTrialDays: TRIAL_CONFIG.defaultTrialDays,
-        enableTrialOverride: TRIAL_CONFIG.enableTrialOverride
-      }
-    });
-  } catch (error) {
-    console.error('Error in subscription plans API:', error);
-    return Response.json(
-      { error: 'Failed to fetch subscription plans' },
-      { status: 500 }
-    );
-  }
+export function isCacheValid(): boolean {
+  return plansCache !== null && Date.now() < cacheExpiry;
 }
-  
+
+/**
+ * Get cache info for debugging
+ */
+export function getCacheInfo() {
+  return {
+    hasCachedPlans: plansCache !== null,
+    cacheExpiry: new Date(cacheExpiry).toISOString(),
+    planCount: plansCache?.length || 0,
+    timeUntilExpiry: Math.max(0, cacheExpiry - Date.now()),
+  };
+}

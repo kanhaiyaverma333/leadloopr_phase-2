@@ -2,14 +2,17 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Loader2, AlertCircle } from 'lucide-react'
-import SubscriptionPage from '@/app/subscription/page' // Adjust path as needed
+import { useOrganization } from '@clerk/nextjs'
+import { Loader2, AlertCircle, Building2 } from 'lucide-react'
+import SubscriptionPage from '@/app/subscription/page'
 
 interface SubscriptionStatus {
   hasActiveSubscription: boolean;
-  subscriptionStatus: 'ACTIVE' | 'TRIAL' | 'PAST_DUE' | 'EXPIRED';
+  subscriptionStatus: 'ACTIVE' | 'TRIAL' | 'PAST_DUE' | 'EXPIRED' | 'CANCELED';
   trialExpired: boolean;
   daysLeftInTrial?: number;
+  organizationId: string;
+  organizationName: string;
 }
 
 interface SubscriptionGuardProps {
@@ -17,16 +20,22 @@ interface SubscriptionGuardProps {
 }
 
 export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
+  const { organization } = useOrganization()
   const [subscriptionStatus, setSubscriptionStatus] = useState<SubscriptionStatus | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const router = useRouter()
 
   useEffect(() => {
-    checkSubscriptionStatus()
-  }, [])
+    // Only check subscription when organization is loaded
+    if (organization) {
+      checkSubscriptionStatus()
+    }
+  }, [organization?.id]) // Re-check when organization changes
 
   const checkSubscriptionStatus = async () => {
+    if (!organization) return
+
     try {
       setLoading(true)
       setError(null)
@@ -36,12 +45,11 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
         headers: {
           'Content-Type': 'application/json',
         },
-        cache: 'no-store' // Ensure fresh data
+        cache: 'no-store'
       })
 
       if (!response.ok) {
         if (response.status === 401) {
-          // User is not authenticated, redirect to login
           router.push('/sign-in')
           return
         }
@@ -49,7 +57,11 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
       }
 
       const data = await response.json()
-      setSubscriptionStatus(data)
+      setSubscriptionStatus({
+        ...data,
+        organizationId: organization.id,
+        organizationName: organization.name
+      })
     } catch (err) {
       console.error('Error checking subscription status:', err)
       setError(err instanceof Error ? err.message : 'Failed to check subscription status')
@@ -58,8 +70,8 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
     }
   }
 
-  // Show loading state while checking subscription
-  if (loading) {
+  // Show loading while organization is loading or subscription is being checked
+  if (!organization || loading) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gradient-to-b from-background to-background/50">
         <div className="text-center">
@@ -68,7 +80,9 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
             <div className="absolute inset-0 h-12 w-12 bg-primary/20 rounded-full blur-xl animate-pulse" />
           </div>
           <h2 className="text-lg font-medium mb-2">Loading Dashboard...</h2>
-          <p className="text-sm text-muted-foreground">Checking your subscription status</p>
+          <p className="text-sm text-muted-foreground">
+            {!organization ? 'Setting up organization...' : 'Checking subscription status...'}
+          </p>
         </div>
       </div>
     )
@@ -81,7 +95,13 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
         <div className="text-center max-w-md px-4">
           <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h2 className="text-xl font-semibold mb-2">Unable to Load Dashboard</h2>
-          <p className="text-muted-foreground mb-6">{error}</p>
+          <div className="mb-4 p-4 bg-muted/50 rounded-lg">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground mb-2">
+              <Building2 className="h-4 w-4" />
+              <span>Organization: {organization.name}</span>
+            </div>
+            <p className="text-sm text-red-600">{error}</p>
+          </div>
           <div className="flex gap-3 justify-center">
             <button
               onClick={checkSubscriptionStatus}
@@ -101,16 +121,34 @@ export function SubscriptionGuard({ children }: SubscriptionGuardProps) {
     )
   }
 
-  // Check if user has active subscription or trial
+  // Check if organization has active subscription or valid trial
   if (subscriptionStatus && !subscriptionStatus.hasActiveSubscription) {
-    // User needs to subscribe - show subscription page inline
     return (
       <div className="min-h-screen bg-gradient-to-b from-background to-background/50">
-        <SubscriptionPage />
+        <div className="container mx-auto px-4 py-8">
+          {/* Organization context header */}
+          <div className="mb-8 text-center">
+            <div className="inline-flex items-center gap-2 px-4 py-2 bg-muted/50 rounded-full text-sm text-muted-foreground mb-4">
+              <Building2 className="h-4 w-4" />
+              <span>{subscriptionStatus.organizationName}</span>
+            </div>
+            <h1 className="text-2xl font-bold mb-2">Subscription Required</h1>
+            <p className="text-muted-foreground">
+              This organization needs an active subscription to access the dashboard.
+              {subscriptionStatus.subscriptionStatus === 'TRIAL' && subscriptionStatus.trialExpired && (
+                <span className="block mt-1 text-amber-600">
+                  Your trial period has expired.
+                </span>
+              )}
+            </p>
+          </div>
+          
+          <SubscriptionPage />
+        </div>
       </div>
     )
   }
 
-  // User has active subscription - show dashboard
+  // Organization has active subscription - show dashboard
   return <>{children}</>
 }

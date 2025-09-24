@@ -1,4 +1,4 @@
-// app/api/webhooks/stripe/route.ts - Updated for Stripe 2025 changes
+// app/api/webhooks/stripe/route.ts
 import { NextRequest, NextResponse } from 'next/server';
 import { stripe } from '../../../../lib/stripe/stripe';
 import { PrismaClient } from '../../../../../../packages/database/generated/client';
@@ -95,18 +95,24 @@ function buildSubscriptionUpdateData(subscription: Stripe.Subscription): any {
     isSubscriptionActive: ['active', 'trialing'].includes(subscription.status),
   };
 
-  // ✅ Always save price ID from first subscription item
+  // ✅ Always capture priceId from first item
   const firstItem = subscription.items.data[0];
   if (firstItem) {
     updateData.stripePriceId = firstItem.price.id;
 
-    // ✅ Handle period dates using subscription item (Stripe 2025 change)
+    // ✅ Handle billing period dates safely
     if (firstItem.current_period_start) {
       updateData.lastBillingDate = new Date(firstItem.current_period_start * 1000);
+    } else if ((subscription as any).current_period_start) {
+      updateData.lastBillingDate = new Date((subscription as any).current_period_start * 1000);
     }
+
     if (firstItem.current_period_end) {
       updateData.subscriptionPeriodEnd = new Date(firstItem.current_period_end * 1000);
       updateData.nextBillingDate = new Date(firstItem.current_period_end * 1000);
+    } else if ((subscription as any).current_period_end) {
+      updateData.subscriptionPeriodEnd = new Date((subscription as any).current_period_end * 1000);
+      updateData.nextBillingDate = new Date((subscription as any).current_period_end * 1000);
     }
   }
 
@@ -256,21 +262,31 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 }
 
 async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
+  const subscriptionId =
+    typeof (invoice as any)?.subscription === 'string'
+      ? (invoice as any).subscription
+      : typeof invoice.lines.data[0]?.subscription === 'string'
+      ? (invoice.lines.data[0]?.subscription as string)
+      : null;
+
   console.log('💰 Processing invoice.payment_succeeded', {
     invoiceId: invoice.id,
     customerId: invoice.customer,
-    subscriptionId: typeof invoice.lines.data[0]?.subscription === 'string'
-      ? invoice.lines.data[0]?.subscription
-      : null,
+    subscriptionId,
     amount: invoice.amount_paid,
   });
 
+  if (!subscriptionId) {
+    console.warn(`⚠️ No subscription ID found on invoice ${invoice.id}`);
+    return;
+  }
+
   try {
     const organization = await prisma.organization.findFirst({
-      where: { stripeCustomerId: invoice.customer as string },
+      where: { stripeSubscriptionId: subscriptionId },
     });
     if (!organization) {
-      console.warn(`⚠️ Organization not found for customer: ${invoice.customer}`);
+      console.warn(`⚠️ Organization not found for subscription: ${subscriptionId}`);
       return;
     }
 
@@ -284,14 +300,8 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
       updateData.billingEmail = invoice.customer_email;
     }
 
-    const subscriptionId =
-      typeof invoice.lines.data[0]?.subscription === 'string'
-        ? invoice.lines.data[0]?.subscription
-        : null;
-    if (subscriptionId) {
-      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-      Object.assign(updateData, buildSubscriptionUpdateData(subscription));
-    }
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    Object.assign(updateData, buildSubscriptionUpdateData(subscription));
 
     await prisma.organization.update({
       where: { id: organization.id },
@@ -309,7 +319,9 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
   const subscriptionId =
     typeof (invoice as any).subscription === 'string'
       ? (invoice as any).subscription
-      : invoice.lines.data[0]?.subscription || null;
+      : typeof invoice.lines.data[0]?.subscription === 'string'
+      ? (invoice.lines.data[0]?.subscription as string)
+      : null;
 
   console.log('❌ Processing invoice.payment_failed', {
     invoiceId: invoice.id,
@@ -317,12 +329,17 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
     subscriptionId,
   });
 
+  if (!subscriptionId) {
+    console.warn(`⚠️ No subscription ID found on failed invoice ${invoice.id}`);
+    return;
+  }
+
   try {
     const organization = await prisma.organization.findFirst({
-      where: { stripeCustomerId: invoice.customer as string },
+      where: { stripeSubscriptionId: subscriptionId },
     });
     if (!organization) {
-      console.warn(`⚠️ Organization not found for customer: ${invoice.customer}`);
+      console.warn(`⚠️ Organization not found for subscription: ${subscriptionId}`);
       return;
     }
 
@@ -331,10 +348,8 @@ async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
       isSubscriptionActive: false,
     };
 
-    if (subscriptionId) {
-      const subscription = await stripe.subscriptions.retrieve(subscriptionId);
-      Object.assign(updateData, buildSubscriptionUpdateData(subscription));
-    }
+    const subscription = await stripe.subscriptions.retrieve(subscriptionId);
+    Object.assign(updateData, buildSubscriptionUpdateData(subscription));
 
     await prisma.organization.update({
       where: { id: organization.id },

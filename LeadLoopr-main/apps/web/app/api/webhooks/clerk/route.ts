@@ -531,7 +531,6 @@ async function handleOrganizationMembershipCreated(membershipData: any) {
 
         if (!user) {
             console.log(`❌ User not found after ${userAttempts} attempts for clerkId: ${clerkUserId}`);
-            console.log(`   This might indicate a race condition or the user was never created`);
             return;
         }
 
@@ -546,11 +545,18 @@ async function handleOrganizationMembershipCreated(membershipData: any) {
 
         if (!organization) {
             console.log(`❌ Organization not found after ${orgAttempts} attempts for clerkOrgId: ${clerkOrgId}`);
-            console.log(`   This might indicate a race condition or the organization was never created`);
             return;
         }
 
-        // Create the organization-user relationship
+        // 👉 Count existing members in this org
+        const memberCount = await prisma.organizationUser.count({
+            where: { organizationId: organization.id },
+        });
+
+        // 👉 First member = ADMIN, all others = MEMBER
+        const role = memberCount === 0 ? "ADMIN" : "MEMBER";
+
+        // Create or update the organization-user relationship
         const membership = await prisma.organizationUser.upsert({
             where: {
                 userId_organizationId: {
@@ -559,15 +565,16 @@ async function handleOrganizationMembershipCreated(membershipData: any) {
                 }
             },
             update: {
-                // No updates needed for existing membership
+                role, // 👈 ensures role stays in sync if re-added
             },
             create: {
                 userId: user.id,
                 organizationId: organization.id,
+                role, // 👈 explicitly set on creation
             }
         });
 
-        console.log(`✅ Organization membership created: User ${user.id} added to organization ${organization.id}`);
+        console.log(`✅ Organization membership created: User ${user.id} (${role}) added to organization ${organization.id}`);
 
         // Optionally set this as the user's current organization if they don't have one
         if (!user.currentOrganizationId) {
@@ -579,7 +586,6 @@ async function handleOrganizationMembershipCreated(membershipData: any) {
                 console.log(`🎯 Set organization ${organization.id} as current for user ${user.id}`);
             } catch (currentOrgError) {
                 console.error(`⚠️ Error setting current organization for user ${user.id}:`, currentOrgError);
-                // Don't throw - this is optional functionality
             }
         }
 
@@ -591,7 +597,6 @@ async function handleOrganizationMembershipCreated(membershipData: any) {
         const processingTime = Date.now() - startTime;
         console.error(`❌ Error creating organization membership after ${processingTime}ms:`, error);
 
-        // Log specific error details for debugging
         if (error instanceof Error) {
             console.error('Error details:', {
                 message: error.message,
@@ -606,6 +611,7 @@ async function handleOrganizationMembershipCreated(membershipData: any) {
         throw error;
     }
 }
+
 
 async function handleOrganizationMembershipDeleted(membershipData: any) {
     const startTime = Date.now();

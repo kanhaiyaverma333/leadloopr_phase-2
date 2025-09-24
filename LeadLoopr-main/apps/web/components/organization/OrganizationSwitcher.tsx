@@ -1,9 +1,9 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useOrganizationList, useOrganization, CreateOrganization } from '@clerk/nextjs'
 import { Button } from '@/components/ui/button'
-import { Building2, ChevronDown, Plus } from 'lucide-react'
+import { Building2, ChevronDown, Plus, AlertCircle, Crown } from 'lucide-react'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -15,6 +15,15 @@ import {
   Dialog,
   DialogContent,
 } from '@/components/ui/dialog'
+import { Badge } from '@/components/ui/badge'
+
+interface OrganizationSubscriptionStatus {
+  organizationId: string;
+  hasActiveSubscription: boolean;
+  subscriptionStatus: 'ACTIVE' | 'TRIAL' | 'PAST_DUE' | 'EXPIRED' | 'CANCELED';
+  trialExpired: boolean;
+  daysLeftInTrial?: number;
+}
 
 export function OrganizationSwitcher() {
   const { userMemberships, setActive, isLoaded } = useOrganizationList({
@@ -25,19 +34,37 @@ export function OrganizationSwitcher() {
   const { organization } = useOrganization()
   const [showCreateModal, setShowCreateModal] = useState(false)
   const [isSwitching, setIsSwitching] = useState(false)
+  const [subscriptionStatuses, setSubscriptionStatuses] = useState<Record<string, OrganizationSubscriptionStatus>>({})
 
-  // Enhanced debug logging
-  console.log('OrganizationSwitcher Debug:', {
-    isLoaded,
-    userMemberships: userMemberships,
-    membershipData: userMemberships?.data,
-    membershipCount: userMemberships?.data?.length,
-    currentOrg: organization?.name,
-    currentOrgId: organization?.id,
-   // hasNext: userMemberships?.hasNext,
-    isLoading: userMemberships?.isLoading,
-    isFetching: userMemberships?.isFetching
-  })
+  // Fetch subscription statuses for all organizations
+  useEffect(() => {
+    if (isLoaded && userMemberships?.data) {
+      fetchSubscriptionStatuses()
+    }
+  }, [isLoaded, userMemberships?.data])
+
+  const fetchSubscriptionStatuses = async () => {
+    if (!userMemberships?.data) return
+
+    const statuses: Record<string, OrganizationSubscriptionStatus> = {}
+
+    // Fetch subscription status for each organization
+    await Promise.all(
+      userMemberships.data.map(async (membership) => {
+        try {
+          const response = await fetch(`/api/billing/organization-subscription-status?orgId=${membership.organization.id}`)
+          if (response.ok) {
+            const data = await response.json()
+            statuses[membership.organization.id] = data
+          }
+        } catch (error) {
+          console.error(`Failed to fetch subscription for org ${membership.organization.id}:`, error)
+        }
+      })
+    )
+
+    setSubscriptionStatuses(statuses)
+  }
 
   // Don't render until loaded
   if (!isLoaded) {
@@ -77,6 +104,34 @@ export function OrganizationSwitcher() {
     }
   }
 
+  const getSubscriptionBadge = (orgId: string) => {
+    const status = subscriptionStatuses[orgId]
+    if (!status) return null
+
+    if (status.hasActiveSubscription) {
+      if (status.subscriptionStatus === 'TRIAL') {
+        return (
+          <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-800">
+            Trial ({status.daysLeftInTrial}d left)
+          </Badge>
+        )
+      }
+      return (
+        <Badge variant="default" className="text-xs bg-green-100 text-green-800">
+          <Crown className="w-3 h-3 mr-1" />
+          Active
+        </Badge>
+      )
+    } else {
+      return (
+        <Badge variant="destructive" className="text-xs">
+          <AlertCircle className="w-3 h-3 mr-1" />
+          No Subscription
+        </Badge>
+      )
+    }
+  }
+
   return (
     <>
       <DropdownMenu>
@@ -87,14 +142,23 @@ export function OrganizationSwitcher() {
             disabled={isSwitching}
           >
             <Building2 className="w-4 h-4" />
-            <span className="truncate">
-              {isSwitching ? 'Switching...' : (organization?.name || (hasOrganizations ? 'Select Organization' : 'No Organization'))}
-            </span>
+            <div className="flex flex-col items-start flex-1 min-w-0">
+              <span className="truncate text-sm">
+                {isSwitching ? 'Switching...' : (organization?.name || (hasOrganizations ? 'Select Organization' : 'No Organization'))}
+              </span>
+              {organization && subscriptionStatuses[organization.id] && (
+                <span className="text-xs text-muted-foreground">
+                  {subscriptionStatuses[organization.id].hasActiveSubscription 
+                    ? subscriptionStatuses[organization.id].subscriptionStatus 
+                    : 'Subscription Required'}
+                </span>
+              )}
+            </div>
             <ChevronDown className="w-4 h-4 ml-auto" />
           </Button>
         </DropdownMenuTrigger>
 
-        <DropdownMenuContent align="start" className="w-56">
+        <DropdownMenuContent align="start" className="w-80">
           {memberships.length === 0 ? (
             <DropdownMenuItem disabled>
               <span className="text-muted-foreground">No organizations found</span>
@@ -104,20 +168,25 @@ export function OrganizationSwitcher() {
               <DropdownMenuItem
                 key={membership.organization.id}
                 onClick={() => handleOrganizationSwitch(membership.organization.id)}
-                className={`cursor-pointer ${organization?.id === membership.organization.id ? 'bg-accent' : ''}`}
+                className={`cursor-pointer p-3 ${organization?.id === membership.organization.id ? 'bg-accent' : ''}`}
                 disabled={isSwitching}
               >
-                <div className="flex items-center gap-2 w-full">
-                  <Building2 className="w-4 h-4" />
+                <div className="flex items-center gap-3 w-full">
+                  <Building2 className="w-5 h-5 flex-shrink-0" />
                   <div className="flex flex-col flex-1 min-w-0">
-                    <span className="truncate font-medium">{membership.organization.name}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {membership.role?.replace('org:', '')}
-                    </span>
+                    <div className="flex items-center gap-2 mb-1">
+                      <span className="truncate font-medium">{membership.organization.name}</span>
+                      {organization?.id === membership.organization.id && (
+                        <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0" />
+                      )}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">
+                        {membership.role?.replace('org:', '')}
+                      </span>
+                      {getSubscriptionBadge(membership.organization.id)}
+                    </div>
                   </div>
-                  {organization?.id === membership.organization.id && (
-                    <div className="w-2 h-2 bg-primary rounded-full" />
-                  )}
                 </div>
               </DropdownMenuItem>
             ))
@@ -127,7 +196,7 @@ export function OrganizationSwitcher() {
 
           <DropdownMenuItem
             onClick={() => setShowCreateModal(true)}
-            className="cursor-pointer text-primary"
+            className="cursor-pointer text-primary p-3"
             disabled={isSwitching}
           >
             <div className="flex items-center gap-2">

@@ -46,7 +46,7 @@ CREATE TABLE "OrganizationUser" (
     "id" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
-    "role" "UserRole" NOT NULL DEFAULT 'MEMBER',
+    "role" "UserRole" NOT NULL DEFAULT 'ADMIN',
 
     CONSTRAINT "OrganizationUser_pkey" PRIMARY KEY ("id")
 );
